@@ -51,10 +51,10 @@ end
 function menu:enter()
     getIP()
 
-    menu.network = {
-        fromHost = love.thread.getChannel('fromHost'),
-        fromClient = love.thread.getChannel('fromClient'),
-    }
+    menu.network = {}
+    menu.fromHost = love.thread.getChannel('fromHost')
+    menu.fromClient = love.thread.getChannel('fromClient')
+    menu.error = love.thread.getChannel('error')
 
     gui.style.font = love.graphics.newFont("res/VenusPlant.otf", 48)
 
@@ -66,6 +66,7 @@ function menu:enter()
     menu.hostGrp = gui:group(nil, {0, 128, 900, 250})
     menu.hostCenterDiv = gui:group(nil, {0, 0, 900, 250}, menu.hostGrp)
     menu.hostTxt = gui:text('Awaiting Opponent...', {0, -40, 800, 700}, menu.hostCenterDiv)
+    menu.hostErrTxt = gui:text('', {0, 0, 1200, 800 })
     -- menu.ipCopyBtn = gui:button()
 
     menu.hostBackBtn = gui:button('Back', {0, 0, 250, 100})
@@ -73,6 +74,8 @@ function menu:enter()
         menu.hostGrp:hide()
         menu.hostBackBtn:hide()
         menu.hostJoinGrp:show()
+        menu.hostErrTxt:hide()
+        menu.hostErrTxt.label = ""
         stopHosting()
         menu.action = nil
         playOneShot("res/Blip.wav")
@@ -128,6 +131,7 @@ function menu:enter()
         menu.connectErrTxt:hide()
         menu.connectErrTxt.label = ""
         playOneShot("res/Blip.wav")
+        stopConnecting()
     end
 end
 
@@ -233,6 +237,8 @@ function stopConnecting()
         gameChannel:push('abort')
         menu.network.clientThread:wait()
         menu.network.clientThread:release()
+        menu.fromClient:clear()
+        menu.error:clear()
     end
     menu.network.clientThread = nil
 end
@@ -255,6 +261,9 @@ function stopHosting()
         gameChannel:push('abort')
         menu.network.hostThread:wait()
         menu.network.hostThread:release()
+        
+        menu.fromHost:clear()
+        love.thread.getChannel('error'):clear()
     end
     menu.network.hostThread = nil
 end
@@ -319,16 +328,35 @@ function menu:update(dt)
 
     local msg = menu.error:pop()
     while msg do
+        local _,index = string.find(msg.error, ".*():")
+        local body = string.sub(msg.error, index + 1)
         if msg.threadName == "Client" then
-            local _,index = string.find(msg.error, ".*():")
-            local body = string.sub(msg.error, index + 1)
-
             menu.connectErrTxt.label = body
             menu.connectErrTxt:show()
             menu.connectTxt:hide()
+        elseif msg.threadName == "Host" then
+            menu.hostErrTxt.label = body
+            menu.hostErrTxt:show()
+            menu.hostGrp:hide()
         end
         print(msg.error)
         msg = menu.error:pop()
+    end
+
+    local msg = menu.fromClient:pop()
+    while msg do
+        if msg == "Connecting" then
+            menu.hostTxt.label = "Connecting"
+        elseif msg == "Connected" then
+            
+        end
+        msg = menu.fromClient:pop()
+    end
+
+    local msg = menu.fromHost:pop()
+    while msg do
+        
+        msg = menu.fromHost:pop()
     end
 end
 

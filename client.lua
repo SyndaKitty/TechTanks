@@ -14,8 +14,23 @@ local status, error = pcall(function()
     local commands = {}
     local version = require "version"
 
-    commands.VerifyVersion = function()
+    function respond(peer, msg)
+        log:push("Client: Sending " .. msg.command)
+        peer:send(bitser.dumps(msg))
+    end
 
+    commands.VerifyVersion = function(data, peer)
+        local response = {
+            command = "VerifyVersion",
+            data = "false"
+        }
+        if data[1] == version then
+            response.data = "true"
+            respond(peer, response)
+        else
+            respond(peer, response)
+            peer:disconnect_later()
+        end
     end
 
     -- Ensure connection
@@ -23,6 +38,19 @@ local status, error = pcall(function()
 
     if not event then
         error("Could not establish connection")
+    end
+
+    local hostState = {}
+
+    function connect(peer)
+        hostState[peer:connect_id()] = {
+            verifiedVersion = false,
+            host = host
+        }
+    end
+
+    function disconnect(peer)
+        hostState[peer:connect_id()] = nil
     end
 
     while true do
@@ -34,21 +62,22 @@ local status, error = pcall(function()
         if not event then
 
         elseif event.type == "connect" then
-            log:push("Client: Connected")
+            log:push("Client: Connected to host " .. event.data)
+            connect(event.peer)
         elseif event.type == "disconnect" then
-            log:push("Client: Disconnected")
+            log:push("Client: Disconnected from host " .. event.data)
+            disconnect(event.peer)
         elseif event.type == "receive" then
-            log:push("Client: Received message")
             local message = bitser.loads(event.data)
             if not message then
                 log:push("Client: Malformed message: " .. event.data)
             else
-                log:push("Client: " .. message.command)
-                commands[message.command](message)
+                log:push("Client: Received " .. message.command)
+                commands[message.command](message.data, event.peer)
             end
         end
 
-        local event = host:service(50)
+        event = host:service(50)
     end
 end)
 
