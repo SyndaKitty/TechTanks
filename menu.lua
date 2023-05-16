@@ -34,7 +34,7 @@ function host()
     menu.hostJoinGrp:hide()
     menu.hostGrp:show()
     menu.hostBackBtn:show()
-
+    playOneShot("res/Blip.wav")
     startHosting()
 end
 
@@ -44,6 +44,7 @@ function join()
     menu.joinGrp:show()
     menu.joinBackBtn:show()
     menu.joinConnectBtn:show()
+    playOneShot("res/Blip.wav")
 end
 
 
@@ -53,7 +54,6 @@ function menu:enter()
     menu.network = {
         fromHost = love.thread.getChannel('fromHost'),
         fromClient = love.thread.getChannel('fromClient'),
-
     }
 
     gui.style.font = love.graphics.newFont("res/VenusPlant.otf", 48)
@@ -75,6 +75,7 @@ function menu:enter()
         menu.hostJoinGrp:show()
         stopHosting()
         menu.action = nil
+        playOneShot("res/Blip.wav")
     end
 
     menu.hostGrp:hide()
@@ -96,6 +97,10 @@ function menu:enter()
         menu.joinConnectBtn:hide()
         menu.joinIpTxt.value = ""
         menu.action = nil
+        playOneShot("res/Blip.wav")
+        
+        menu.connectTxt:hide()
+        menu.connectBackBtn:hide()
         stopConnecting()
     end
 
@@ -106,7 +111,24 @@ function menu:enter()
     menu.joinBackBtn:hide()
     menu.joinConnectBtn:hide()
 
-    menu.connectTxt = gui:text('')
+    menu.connectTxt = gui:text('Connecting', {0, 0, 450, 100}, nil)
+    menu.connectTxt:hide()
+
+    menu.connectErrTxt = gui:text('', {0, 0, 1200, 800}, nil)
+    menu.connectErrTxt:hide()
+
+    menu.connectBackBtn = gui:button('Back', {450, 700, 250, 100})
+    menu.connectBackBtn:hide()
+    menu.connectBackBtn.click = function()
+        menu.connectTxt:hide()
+        menu.connectBackBtn:hide()
+        menu.joinGrp:show()
+        menu.joinBackBtn:show()
+        menu.joinConnectBtn:show()
+        menu.connectErrTxt:hide()
+        menu.connectErrTxt.label = ""
+        playOneShot("res/Blip.wav")
+    end
 end
 
 function tryConnect()
@@ -118,8 +140,11 @@ function tryConnect()
     menu.joinConnectBtn:hide()
 
     menu.action = "connect"
-    menu.opponentIP = ip
 
+    menu.connectTxt:show()
+    menu.connectBackBtn:show()
+
+    playOneShot("res/Blip.wav")
     startConnecting(ip)
 end
 
@@ -185,54 +210,62 @@ function stretchX(element)
     element.pos.w = cp.w
 end
 
+function stretchY(element)
+    local cp = containerPos(element)
+    element.pos.h = cp.h
+end
+
 function followY(element, predecessor, spacing)
     if not spacing then spacing = 0 end
     element.pos.y = predecessor.pos.y + predecessor.pos.h + spacing
 end
 -- endregion
 
+function bottomY(element)
+    local c = containerPos(element)
+    element.pos.y = c.y + c.h - element.pos.h
+end
+
 function stopConnecting()
-    if menu.clientThread and menu.clientThread:isRunning() then
+    if menu.network.clientThread and menu.network.clientThread:isRunning() then
         print("Closing down existing clientThread")
         local gameChannel = love.thread.getChannel('fromGameToClient')
         gameChannel:push('abort')
-        menu.hostThread:wait()
-        menu.hostThread:release()
+        menu.network.clientThread:wait()
+        menu.network.clientThread:release()
     end
-    menu.clientThread = nil
+    menu.network.clientThread = nil
 end
 
 function startConnecting(ip)
-    if menu.clientThread then
+    if menu.network.clientThread then
         stopConnecting()
     end
 
-    menu.clientThread = love.thread.newThread(love.filesystem.newFileData('client.lua'))
-    menu.clientThread:start()
-
-    love.thread.getChannel('fromGameToClient'):push(ip)
+    menu.network.clientThread = love.thread.newThread(love.filesystem.newFileData('client.lua'))
+    menu.network.clientThread:start(ip)
 
     print('Started client')
 end
 
 function stopHosting()
-    if menu.hostThread and menu.hostThread:isRunning() then
+    if menu.network.hostThread and menu.network.hostThread:isRunning() then
         print('Closing down existing hostThread')
         local gameChannel = love.thread.getChannel('fromGameToHost')
         gameChannel:push('abort')
-        menu.hostThread:wait()
-        menu.hostThread:release()
+        menu.network.hostThread:wait()
+        menu.network.hostThread:release()
     end
-    menu.hostThread = nil
+    menu.network.hostThread = nil
 end
 
 function startHosting()
-    if menu.hostThread then
+    if menu.network.hostThread then
         stopHosting()
     end
 
-    menu.hostThread = love.thread.newThread(love.filesystem.newFileData('host.lua'))
-    menu.hostThread:start()
+    menu.network.hostThread = love.thread.newThread(love.filesystem.newFileData('host.lua'))
+    menu.network.hostThread:start()
 
     print("Started host")
 end
@@ -255,6 +288,15 @@ function menu:draw()
     menu.joinBackBtn.pos.x = menu.joinGrp.pos.x
     menu.joinConnectBtn.pos.x = menu.joinGrp.pos.x + 300
 
+    centerX(menu.connectTxt)
+    centerY(menu.connectTxt)
+
+    stretchX(menu.connectErrTxt)
+    stretchY(menu.connectErrTxt)
+
+    centerX(menu.connectBackBtn)
+    bottomY(menu.connectBackBtn)
+
     gui:draw()
     love.graphics.print("Menu", 0, 0)
 end
@@ -265,11 +307,39 @@ function menu:update(dt)
     if not menu.log then
         menu.log = love.thread.getChannel('log')
     end
+    if not menu.error then
+        menu.error = love.thread.getChannel('error')
+    end
+
     local msg = menu.log:pop()
     while msg do
         print(msg)
         msg = menu.log:pop()
     end
+
+    local msg = menu.error:pop()
+    while msg do
+        if msg.threadName == "Client" then
+            local _,index = string.find(msg.error, ".*():")
+            local body = string.sub(msg.error, index + 1)
+
+            menu.connectErrTxt.label = body
+            menu.connectErrTxt:show()
+            menu.connectTxt:hide()
+        end
+        print(msg.error)
+        msg = menu.error:pop()
+    end
+end
+
+function playOneShot(sound)
+    menu.sounds = menu.sounds or {}
+    if not menu.sounds[sound] then
+        local src = love.audio.newSource(sound, "static")
+        src:setVolume(1)
+        menu.sounds[sound] = src
+    end
+    menu.sounds[sound]:play()
 end
 
 function menu:textinput(key)
@@ -292,6 +362,10 @@ end
 
 function menu:keypressed(key, scancode, isrepeat)
     gui:keypress(key, scancode, isrepeat)
+end
+
+function menu.threaderror(thread, errorstr)
+    error(errorstr)
 end
 
 return menu

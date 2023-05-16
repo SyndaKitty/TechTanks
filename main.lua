@@ -14,6 +14,15 @@ Menu = require "menu"
 
 
 function love.load()
-    Gamestate.registerEvents({'draw', 'update', 'keypressed', 'textinput', 'mousepressed', 'mousereleased', 'quit'})
+    Gamestate.registerEvents({'draw', 'update', 'keypressed', 'textinput', 'mousepressed', 'mousereleased', 'quit' })
     Gamestate.switch(Menu)
+end
+
+Panic = love.threaderror
+
+function love.threaderror(thread, errorstr)
+    local gs = Gamestate.current()
+    if gs and gs.threaderror then
+        gs.threaderror(thread, errorstr)
+    end
 end
