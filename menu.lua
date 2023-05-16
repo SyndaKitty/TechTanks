@@ -3,22 +3,23 @@ local menu = {}
 local gui = require "Gspot"
 local enet = require "enet"
 
+
 function getIP()
     if menu.IP then
         return menu.IP
     end
 
     if not menu.IPThread then
-        menu.IPThread = love.thread.newThread(love.filesystem.newFileData('ip.lua'))
+        menu.IPThread = love.thread.newThread(love.filesystem.newFileData("ip.lua"))
         menu.IPThread:start()
     end
 
     if not menu.IPThread:isRunning() then
         local error = menu.IPThread:getError()
         if error then
-            print('Error: ' .. error)
+            print("Error: " .. error)
         else
-            menu.IP = love.thread.getChannel('ip'):pop()
+            menu.IP = love.thread.getChannel("ip"):pop()
         end
 
         menu.IPThread:release()
@@ -26,130 +27,6 @@ function getIP()
     end
 
     return menu.IP or ""
-end
-
-
-function host()
-    menu.action = "host"
-    menu.hostJoinGrp:hide()
-    menu.hostGrp:show()
-    menu.hostBackBtn:show()
-    playOneShot("res/Blip.wav")
-    startHosting()
-end
-
-function join()
-    menu.action = "join"
-    menu.hostJoinGrp:hide()
-    menu.joinGrp:show()
-    menu.joinBackBtn:show()
-    menu.joinConnectBtn:show()
-    playOneShot("res/Blip.wav")
-end
-
-
-function menu:enter()
-    getIP()
-
-    menu.network = {}
-    menu.fromHost = love.thread.getChannel('fromHost')
-    menu.fromClient = love.thread.getChannel('fromClient')
-    menu.error = love.thread.getChannel('error')
-
-    gui.style.font = love.graphics.newFont("res/VenusPlant.otf", 48)
-
-    menu.hostJoinGrp = gui:group(nil, {0, 128, 600, 256})
-
-    menu.hostBtn = gui:button('Host', { 0, 0, 300, 128}, menu.hostJoinGrp)
-    menu.hostBtn.click = host
-
-    menu.hostGrp = gui:group(nil, {0, 128, 900, 250})
-    menu.hostCenterDiv = gui:group(nil, {0, 0, 900, 250}, menu.hostGrp)
-    menu.hostTxt = gui:text('Awaiting Opponent...', {0, -40, 800, 700}, menu.hostCenterDiv)
-    menu.hostErrTxt = gui:text('', {0, 0, 1200, 800 })
-    -- menu.ipCopyBtn = gui:button()
-
-    menu.hostBackBtn = gui:button('Back', {0, 0, 250, 100})
-    menu.hostBackBtn.click = function()
-        menu.hostGrp:hide()
-        menu.hostBackBtn:hide()
-        menu.hostJoinGrp:show()
-        menu.hostErrTxt:hide()
-        menu.hostErrTxt.label = ""
-        stopHosting()
-        menu.action = nil
-        playOneShot("res/Blip.wav")
-    end
-
-    menu.hostGrp:hide()
-    menu.hostBackBtn:hide()
-
-
-    menu.joinBtn = gui:button('Join', { 316, 0, 300, 128}, menu.hostJoinGrp)
-    menu.joinBtn.click = join
-
-    menu.joinGrp = gui:group(nil, {0, 128, 600, 100})
-    menu.joinIpTxt = gui:input("IP: ", {y = 0, w = 650, h = 100}, menu.joinGrp)
-    menu.joinIpTxt.done = tryConnect
-
-    menu.joinBackBtn = gui:button('Back', {300, 0, 250, 100})
-    menu.joinBackBtn.click = function()
-        menu.joinGrp:hide()
-        menu.joinBackBtn:hide()
-        menu.hostJoinGrp:show()
-        menu.joinConnectBtn:hide()
-        menu.joinIpTxt.value = ""
-        menu.action = nil
-        playOneShot("res/Blip.wav")
-        
-        menu.connectTxt:hide()
-        menu.connectBackBtn:hide()
-        stopConnecting()
-    end
-
-    menu.joinConnectBtn = gui:button('Connect', {600, 0, 350, 100})
-    menu.joinConnectBtn.click = tryConnect
-
-    menu.joinGrp:hide()
-    menu.joinBackBtn:hide()
-    menu.joinConnectBtn:hide()
-
-    menu.connectTxt = gui:text('Connecting', {0, 0, 450, 100}, nil)
-    menu.connectTxt:hide()
-
-    menu.connectErrTxt = gui:text('', {0, 0, 1200, 800}, nil)
-    menu.connectErrTxt:hide()
-
-    menu.connectBackBtn = gui:button('Back', {450, 700, 250, 100})
-    menu.connectBackBtn:hide()
-    menu.connectBackBtn.click = function()
-        menu.connectTxt:hide()
-        menu.connectBackBtn:hide()
-        menu.joinGrp:show()
-        menu.joinBackBtn:show()
-        menu.joinConnectBtn:show()
-        menu.connectErrTxt:hide()
-        menu.connectErrTxt.label = ""
-        playOneShot("res/Blip.wav")
-        stopConnecting()
-    end
-end
-
-function tryConnect()
-    local ip = menu.joinIpTxt.value
-    print("Attempting to connect to " .. ip)
-
-    menu.joinGrp:hide()
-    menu.joinBackBtn:hide()
-    menu.joinConnectBtn:hide()
-
-    menu.action = "connect"
-
-    menu.connectTxt:show()
-    menu.connectBackBtn:show()
-
-    playOneShot("res/Blip.wav")
-    startConnecting(ip)
 end
 
 
@@ -223,68 +100,177 @@ function followY(element, predecessor, spacing)
     if not spacing then spacing = 0 end
     element.pos.y = predecessor.pos.y + predecessor.pos.h + spacing
 end
--- endregion
 
 function bottomY(element)
     local c = containerPos(element)
     element.pos.y = c.y + c.h - element.pos.h
 end
+-- endregion
 
-function stopConnecting()
-    if menu.network.clientThread and menu.network.clientThread:isRunning() then
-        print("Closing down existing clientThread")
-        local gameChannel = love.thread.getChannel('fromGameToClient')
-        gameChannel:push('abort')
-        menu.network.clientThread:wait()
-        menu.network.clientThread:release()
-        menu.fromClient:clear()
-        menu.error:clear()
+
+function menu:enter()
+    getIP()
+
+    menu.network = {
+        status = nil
+    }
+    menu.channels = {
+        fromNetwork = love.thread.getChannel("fromNetwork"),
+        log = love.thread.getChannel("log"),
+        error = love.thread.getChannel("error")
+    }
+
+    gui.style.font = love.graphics.newFont("res/VenusPlant.otf", 48)
+
+    menu.hostJoinGrp = gui:group(nil, {0, 128, 600, 256})
+
+    menu.hostBtn = gui:button("Host", { 0, 0, 300, 128}, menu.hostJoinGrp)
+    menu.hostBtn.click = startHost
+
+    menu.hostGrp = gui:group(nil, {0, 128, 900, 250})
+    menu.hostCenterDiv = gui:group(nil, {0, 0, 900, 250}, menu.hostGrp)
+    menu.hostTxt = gui:text("Awaiting Opponent...", {0, -40, 800, 700}, menu.hostCenterDiv)
+    menu.hostErrTxt = gui:text("", {0, 0, 1200, 800 })
+    -- menu.ipCopyBtn = gui:button()
+
+    menu.hostBackBtn = gui:button("Back", {0, 0, 250, 100})
+    menu.hostBackBtn.click = function()
+        menu.hostGrp:hide()
+        menu.hostBackBtn:hide()
+        menu.hostJoinGrp:show()
+        menu.hostErrTxt:hide()
+        menu.hostErrTxt.label = ""
+        stopConnecting()
+        playOneShot("res/Blip.wav")
     end
-    menu.network.clientThread = nil
-end
 
-function startConnecting(ip)
-    if menu.network.clientThread then
+    menu.hostGrp:hide()
+    menu.hostBackBtn:hide()
+
+
+    menu.joinBtn = gui:button("Join", { 316, 0, 300, 128}, menu.hostJoinGrp)
+    menu.joinBtn.click = showJoinScreen
+
+    menu.joinGrp = gui:group(nil, {0, 128, 600, 100})
+    menu.joinIpTxt = gui:input("IP: ", {y = 0, w = 650, h = 100}, menu.joinGrp)
+    menu.joinIpTxt.done = startClient
+
+    menu.joinBackBtn = gui:button("Back", {300, 0, 250, 100})
+    menu.joinBackBtn.click = function()
+        menu.joinGrp:hide()
+        menu.joinBackBtn:hide()
+        menu.hostJoinGrp:show()
+        menu.joinConnectBtn:hide()
+        menu.joinIpTxt.value = ""
+        playOneShot("res/Blip.wav")
+        
+        menu.connectTxt:hide()
+        menu.connectBackBtn:hide()
         stopConnecting()
     end
 
-    menu.network.clientThread = love.thread.newThread(love.filesystem.newFileData('client.lua'))
-    menu.network.clientThread:start(ip)
+    menu.joinConnectBtn = gui:button("Connect", {600, 0, 350, 100})
+    menu.joinConnectBtn.click = startClient
 
-    print('Started client')
-end
+    menu.joinGrp:hide()
+    menu.joinBackBtn:hide()
+    menu.joinConnectBtn:hide()
 
-function stopHosting()
-    if menu.network.hostThread and menu.network.hostThread:isRunning() then
-        print('Closing down existing hostThread')
-        local gameChannel = love.thread.getChannel('fromGameToHost')
-        gameChannel:push('abort')
-        menu.network.hostThread:wait()
-        menu.network.hostThread:release()
-        
-        menu.fromHost:clear()
-        love.thread.getChannel('error'):clear()
+    menu.connectTxt = gui:text("Connecting", {0, 0, 450, 100}, nil)
+    menu.connectTxt:hide()
+
+    menu.connectErrTxt = gui:text("", {0, 0, 1200, 800}, nil)
+    menu.connectErrTxt:hide()
+
+    menu.connectBackBtn = gui:button("Back", {450, 700, 250, 100})
+    menu.connectBackBtn:hide()
+    menu.connectBackBtn.click = function()
+        menu.connectTxt:hide()
+        menu.connectBackBtn:hide()
+        menu.joinGrp:show()
+        menu.joinBackBtn:show()
+        menu.joinConnectBtn:show()
+        menu.connectErrTxt:hide()
+        menu.connectErrTxt.label = ""
+        playOneShot("res/Blip.wav")
+        stopConnecting()
     end
-    menu.network.hostThread = nil
 end
 
-function startHosting()
-    if menu.network.hostThread then
-        stopHosting()
+
+function showJoinScreen()
+    menu.hostJoinGrp:hide()
+    menu.joinGrp:show()
+    menu.joinBackBtn:show()
+    menu.joinConnectBtn:show()
+    menu.joinIpTxt:focus()
+    playOneShot("res/Blip.wav")
+end
+
+
+function startClient()
+    local ip = menu.joinIpTxt.value
+    print("Attempting to connect to " .. ip)
+
+    menu.joinGrp:hide()
+    menu.joinBackBtn:hide()
+    menu.joinConnectBtn:hide()
+
+    menu.connectTxt:show()
+    menu.connectBackBtn:show()
+
+    playOneShot("res/Blip.wav")
+    startConnecting(ip)
+end
+
+
+function startHost()
+    menu.hostJoinGrp:hide()
+    menu.hostGrp:show()
+    menu.hostBackBtn:show()
+    playOneShot("res/Blip.wav")
+    startConnecting()
+end
+
+
+function stopConnecting()
+    if menu.network.thread and menu.network.thread:isRunning() then
+        print("Stopping network thread")
+        local gameChannel = love.thread.getChannel("fromGame")
+        gameChannel:push("abort")
+        menu.network.thread:wait()
+        menu.network.thread:release()
+        menu.channels.fromNetwork:clear()
+        menu.channels.error:clear()
+    end
+    menu.network.thread = nil
+end
+
+
+function startConnecting(ip)
+    menu.network.isServer = ip == nil
+    if menu.network.thread then
+        stopConnecting()
     end
 
-    menu.network.hostThread = love.thread.newThread(love.filesystem.newFileData('host.lua'))
-    menu.network.hostThread:start()
+    menu.network.thread = love.thread.newThread(love.filesystem.newFileData("network.lua"))
+    menu.network.thread:start(ip)
 
-    print("Started host")
+    print("Started network thread")
 end
+
 
 function menu:draw()
     shrinkFit(menu.hostJoinGrp)
     center(menu.hostJoinGrp)
     center(menu.hostGrp)
 
-    menu.hostTxt.label = 'Awaiting Opponent...\nYour IP is: ' .. getIP()
+    if not menu.network.status then
+        menu.hostTxt.label = "Awaiting Opponent...\nYour IP is: " .. getIP()
+    else
+        menu.hostTxt.label = menu.network.status
+    end
+    
     shrinkFit(menu.hostCenterDiv)
     center(menu.hostCenterDiv)
 
@@ -313,50 +299,47 @@ end
 function menu:update(dt)
     gui:update(dt)
 
-    if not menu.log then
-        menu.log = love.thread.getChannel('log')
-    end
-    if not menu.error then
-        menu.error = love.thread.getChannel('error')
-    end
-
-    local msg = menu.log:pop()
+    local msg = menu.channels.log:pop()
     while msg do
         print(msg)
-        msg = menu.log:pop()
+        msg = menu.channels.log:pop()
     end
 
-    local msg = menu.error:pop()
+    local msg = menu.channels.error:pop()
     while msg do
         local _,index = string.find(msg.error, ".*():")
-        local body = string.sub(msg.error, index + 1)
-        if msg.threadName == "Client" then
-            menu.connectErrTxt.label = body
-            menu.connectErrTxt:show()
-            menu.connectTxt:hide()
-        elseif msg.threadName == "Host" then
+        local body
+        if index then
+            body = string.sub(msg.error, index + 1)
+        else
+            body = msg.error
+        end
+        if menu.isServer then
             menu.hostErrTxt.label = body
             menu.hostErrTxt:show()
             menu.hostGrp:hide()
+        else
+            menu.connectErrTxt.label = body
+            menu.connectErrTxt:show()
+            menu.connectTxt:hide()
         end
         print(msg.error)
-        msg = menu.error:pop()
+        msg = menu.channels.error:pop()
     end
 
-    local msg = menu.fromClient:pop()
+    local msg = menu.channels.fromNetwork:pop()
     while msg do
         if msg == "Connecting" then
-            menu.hostTxt.label = "Connecting"
+            menu.network.status = msg
         elseif msg == "Connected" then
-            
+            menu.network.status = msg
+        elseif msg == "Start" then
+            Game.initNetwork(menu.network)
+            Gamestate.switch(Game)
+        elseif msg == "Disconnected" then
+            menu.network.status = nil
         end
-        msg = menu.fromClient:pop()
-    end
-
-    local msg = menu.fromHost:pop()
-    while msg do
-        
-        msg = menu.fromHost:pop()
+        msg = menu.channels.fromNetwork:pop()
     end
 end
 

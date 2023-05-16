@@ -8,7 +8,7 @@ function game:draw()
 
 end
 
-function initNetwork(networkData)
+function game.initNetwork(networkData)
     game.network = networkData
 end
 
