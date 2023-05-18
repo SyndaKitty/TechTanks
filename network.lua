@@ -3,6 +3,7 @@ local bitser = require "bitser"
 
 local ip = ...
 local isServer = ip == nil
+local isClient = not isServer
 local running = true
 local exitCode
 local version = require "version"
@@ -11,7 +12,8 @@ local channels = {
     fromNetwork = love.thread.getChannel("fromNetwork"),
     fromGame = love.thread.getChannel("fromGame"),
     log = love.thread.getChannel("log"),
-    error = love.thread.getChannel("error")
+    error = love.thread.getChannel("error"),
+    networkLog = love.thread.getChannel("networkLog"),
 }
 local commands = {}
 
@@ -40,13 +42,12 @@ commands.VerifyVersion = function(data, peer)
     if data[1] ~= version then
         running = false
         exitCode = "Version mismatch"
-        return
     end
 
-    if isServer then
-        channels.fromNetwork:push("Start")
-    else
+    if isClient then
         sendVerifyVersion(peer)
+    end
+    if running then
         channels.fromNetwork:push("Start")
     end
 end
@@ -67,17 +68,12 @@ function disconnect(p)
     channels.log:push("Peer disconnected " .. peer:connect_id())
     channels.fromNetwork:push("Disconnected")
     peer = nil
-
-    if not isServer then
-        exitCode = "Player Disconnected"
-        running = false
-    end
 end
 
 
 function handleEvent(event)
     if not event then
-
+        return
     elseif event.type == "connect" then
         connect(event.peer)
     elseif event.type == "disconnect" then
@@ -88,10 +84,16 @@ function handleEvent(event)
             channels.log.push("Malformed message: " .. event.data)
         else
             channels.log:push("Received message " .. message.command)
-            commands[message.command](message.data, event.peer)
+            channels.networkLog:push(message)
+            if commands[message.command] then
+                commands[message.command](message.data, event.peer)
+            else
+                channels.fromNetwork:push(message)
+            end
         end
     end
 end
+
 
 local status, error = pcall(function()
     local host
@@ -106,7 +108,7 @@ local status, error = pcall(function()
         host = enet.host_create()
         host:connect(ip .. ":49620")
         local event = host:service(5000)
-        
+
         if not event then
             exitCode = "Could not establish connection"
             return
@@ -118,16 +120,18 @@ local status, error = pcall(function()
         if not running then
             return
         end
-        
+
         local msg = channels.fromGame:pop()
-        if msg == "abort" then
+        if type(msg) == "table" then
+            respond(msg)
+        elseif msg == "abort" then
             peer:disconnect()
             host:flush()
             return
         end
 
         local event = host:service(50)
-        while event do
+        while event and running do
             handleEvent(event)
             event = host:service()
         end

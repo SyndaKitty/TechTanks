@@ -38,9 +38,3 @@ Graphics
 
 Audio
 - bfxr
-
-
-Tasks
-    Monday
-        Main menu, host/join
-        Object moving on screen on both

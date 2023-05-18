@@ -1,7 +1,6 @@
 local menu = {}
 
 local gui = require "Gspot"
-local enet = require "enet"
 
 
 function getIP()
@@ -108,6 +107,11 @@ end
 -- endregion
 
 
+function menu.initArgs(args)
+    menu.args = args
+end
+
+
 function menu:enter()
     getIP()
 
@@ -141,7 +145,7 @@ function menu:enter()
         menu.hostErrTxt:hide()
         menu.hostErrTxt.label = ""
         stopConnecting()
-        playOneShot("res/Blip.wav")
+        menu.playOneShot("res/Blip.wav")
     end
 
     menu.hostGrp:hide()
@@ -162,7 +166,7 @@ function menu:enter()
         menu.hostJoinGrp:show()
         menu.joinConnectBtn:hide()
         menu.joinIpTxt.value = ""
-        playOneShot("res/Blip.wav")
+        menu.playOneShot("res/Blip.wav")
         
         menu.connectTxt:hide()
         menu.connectBackBtn:hide()
@@ -192,8 +196,15 @@ function menu:enter()
         menu.joinConnectBtn:show()
         menu.connectErrTxt:hide()
         menu.connectErrTxt.label = ""
-        playOneShot("res/Blip.wav")
+        menu.playOneShot("res/Blip.wav")
         stopConnecting()
+    end
+
+    if menu.args[1] == "host" then
+        startHost()
+    elseif menu.args[1] == "join" then
+        menu.joinIpTxt.value = menu.args[2]
+        startClient()
     end
 end
 
@@ -204,7 +215,7 @@ function showJoinScreen()
     menu.joinBackBtn:show()
     menu.joinConnectBtn:show()
     menu.joinIpTxt:focus()
-    playOneShot("res/Blip.wav")
+    menu.playOneShot("res/Blip.wav")
 end
 
 
@@ -219,7 +230,7 @@ function startClient()
     menu.connectTxt:show()
     menu.connectBackBtn:show()
 
-    playOneShot("res/Blip.wav")
+    menu.playOneShot("res/Blip.wav")
     startConnecting(ip)
 end
 
@@ -228,7 +239,7 @@ function startHost()
     menu.hostJoinGrp:hide()
     menu.hostGrp:show()
     menu.hostBackBtn:show()
-    playOneShot("res/Blip.wav")
+    menu.playOneShot("res/Blip.wav")
     startConnecting()
 end
 
@@ -248,7 +259,14 @@ end
 
 
 function startConnecting(ip)
-    menu.network.isServer = ip == nil
+    if ip == nil then
+        menu.network.isServer = true
+        menu.network.playerNum = 1
+    else
+        menu.network.isServer = false
+        menu.network.playerNum = 2
+    end
+
     if menu.network.thread then
         stopConnecting()
     end
@@ -296,6 +314,27 @@ function menu:draw()
     love.graphics.print("Menu", 0, 0)
 end
 
+
+function showNetworkError(msg)
+    print("Displaying message: " .. msg)
+    if menu.network.isServer then
+        menu.hostErrTxt.label = msg
+        menu.hostErrTxt:show()
+        menu.hostGrp:hide()
+    else
+        menu.connectErrTxt.label = msg
+        menu.connectErrTxt:show()
+        menu.connectTxt:hide()
+    end
+end
+
+
+function menu:resume(_, msg)
+    showNetworkError(msg)
+    stopConnecting()
+end
+
+
 function menu:update(dt)
     gui:update(dt)
 
@@ -314,15 +353,7 @@ function menu:update(dt)
         else
             body = msg.error
         end
-        if menu.isServer then
-            menu.hostErrTxt.label = body
-            menu.hostErrTxt:show()
-            menu.hostGrp:hide()
-        else
-            menu.connectErrTxt.label = body
-            menu.connectErrTxt:show()
-            menu.connectTxt:hide()
-        end
+        showNetworkError(body)
         print(msg.error)
         msg = menu.channels.error:pop()
     end
@@ -335,15 +366,19 @@ function menu:update(dt)
             menu.network.status = msg
         elseif msg == "Start" then
             Game.initNetwork(menu.network)
-            Gamestate.switch(Game)
+            print("Start game")
+            Gamestate.push(Game)
+            return
         elseif msg == "Disconnected" then
             menu.network.status = nil
+            showNetworkError("Opponent retreated")
         end
         msg = menu.channels.fromNetwork:pop()
     end
 end
 
-function playOneShot(sound)
+
+function menu.playOneShot(sound)
     menu.sounds = menu.sounds or {}
     if not menu.sounds[sound] then
         local src = love.audio.newSource(sound, "static")
@@ -353,30 +388,42 @@ function playOneShot(sound)
     menu.sounds[sound]:play()
 end
 
+
 function menu:textinput(key)
     if gui.focus then
         gui:textinput(key)
     end
 end
 
+
 function menu:mousepressed(x, y, button)
     gui:mousepress(x, y, button)
 end
+
 
 function menu:mousereleased (x, y, button)
 	gui:mouserelease(x, y, button)
 end
 
+
 function menu:wheelmoved(x, y)
 	gui:mousewheel(x, y)
 end
+
 
 function menu:keypressed(key, scancode, isrepeat)
     gui:keypress(key, scancode, isrepeat)
 end
 
+
 function menu.threaderror(thread, errorstr)
     error(errorstr)
 end
+
+
+function menu.quit()
+    stopConnecting()
+end
+
 
 return menu
