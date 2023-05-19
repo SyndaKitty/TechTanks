@@ -167,7 +167,6 @@ function menu:enter()
         menu.joinConnectBtn:hide()
         menu.joinIpTxt.value = ""
         menu.playOneShot("res/Blip.wav")
-        
         menu.connectTxt:hide()
         menu.connectBackBtn:hide()
         stopConnecting()
@@ -316,7 +315,6 @@ end
 
 
 function showNetworkError(msg)
-    print("Displaying message: " .. msg)
     if menu.network.isServer then
         menu.hostErrTxt.label = msg
         menu.hostErrTxt:show()

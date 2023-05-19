@@ -1,13 +1,8 @@
-local bitser = require "bitser"
 local pprint = require "pprint"
+local maps = require "maps"
 
 local game = {}
-local maps = {
-    "Map01.png",
-    "Map02.png",
-    "Map03.png",
-    "Map04.png"
-}
+
 
 function disconnect()
     if game.network.thread then
@@ -21,42 +16,64 @@ function disconnect()
 end
 
 
+function refreshMapPool()
+    game.mapPool = {}
+    for _,m in ipairs(maps.files) do
+        print(m.index .. " " .. m.name)
+        game.mapPool[#game.mapPool+1] = m
+    end
+end
+
+
 function selectMap()
-    local possibleMaps = {}
-    for _,map in ipairs(maps) do
-        if not game.selectedMaps[map] then
-            possibleMaps[#possibleMaps + 1] = map
-        end
+    if not game.mapPool or #game.mapPool == 0 then
+        refreshMapPool()
     end
 
-    if #possibleMaps == 0 then
-        game.selectedMaps = {}
-        selectMap()
+    if not game.network.isServer then
+        game.mapEntry = game.mapPool[game.state.mapIndex]
+        return
+    elseif game.mapEntry then
         return
     end
 
-    game.state.map = math.random(#possibleMaps)
-    game.selectedMaps[#game.selectedMaps + 1] = possibleMaps[game.state.map]
+    local index = love.math.random(#game.mapPool)
+    game.mapEntry = table.remove(game.mapPool, index)
+    game.state.mapIndex = game.mapEntry.index
 end
 
 
 function startRound()
-    game.state.map = selectMap()
+    if game.network.isServer then
+        game.waitTimeLeft = 3
+    else
+        -- enet seems to overestimate ping at first, so to ensure client doesn't get too far ahead
+        -- we divide ping by 4 instead of 2
+        -- discrepancy could be due to clumsy not delaying messages symmetrically though
+        game.waitTimeLeft = 3 - game.ping / 4
+    end
+
+    selectMap()
+    game.world = love.physics.newWorld()
+    game.map = maps.instantiate(game.mapEntry.name, game.world)
 end
 
 
 function endRound()
     game.state.shells = {}
     game.state.tanks = {}
+    game.mapName = nil
+    game.world:destroy()
+    game.world = nil
+    game.state.mapIndex = nil
 end
 
 
 function sendStart()
+    print("sendStart")
     game.channels.fromGame:push({
         command = "Start",
-        data = {
-            game.state
-        }
+        data = game.state
     })
 end
 
@@ -64,28 +81,28 @@ end
 function sendGameState()
     game.channels.fromGame:push({
         command = "State",
-        data = {
-            game.state
-        }
+        data = game.state
     })
 end
 
 
 function startGame(state)
+    print("startGame")
     if state then
-        game.state = state[1]
+        game.state = state
     else
         game.state = {
             roundsWon = 0,
             roundsLost = 0,
             shells = {},
             tanks = {},
-            waitTimeLeft = 3,
         }
-        game.selectedMaps = {}
-        startRound()
+        game.lastUpdateSent = 0
+        game.networkUpdateInterval = 0.1
+        selectMap()
         sendStart()
     end
+    startRound()
     playSound("res/Beep1.wav")
     print(3)
 end
@@ -110,11 +127,9 @@ function game:enter()
         log = love.thread.getChannel("log"),
         networkLog = love.thread.getChannel("networkLog")
     }
+    game.ping = .1 -- A guess
     if game.network.isServer then
-        game.networkLogFile = "log-server"
         startGame()
-    else
-        game.networkLogFile = "log-client"
     end
 end
 
@@ -146,12 +161,13 @@ end
 
 function game.handleGame(dt)
     local s = game.state
+    local n = game.network
     if not s then return end
 
-    if not game.state.unlocked then
-        local timeLeftBefore = math.ceil(s.waitTimeLeft)
-        s.waitTimeLeft = s.waitTimeLeft - dt
-        local timeLeftAfter = math.ceil(s.waitTimeLeft)
+    if not s.unlocked then
+        local timeLeftBefore = math.ceil(game.waitTimeLeft)
+        game.waitTimeLeft = game.waitTimeLeft - dt
+        local timeLeftAfter = math.ceil(game.waitTimeLeft)
 
         if timeLeftAfter < timeLeftBefore then
             if timeLeftAfter > 0 then
@@ -160,11 +176,17 @@ function game.handleGame(dt)
             else
                 print("Begin!")
                 playSound("res/Beep2.wav")
-                game.state.unlocked = true
+                s.unlocked = true
             end
         end
     else
-        
+        if n.isServer then
+            game.lastUpdateSent = game.lastUpdateSent + dt
+            if game.lastUpdateSent > game.networkUpdateInterval then
+                sendGameState()
+                game.lastUpdateSent = game.lastUpdateSent - game.networkUpdateInterval
+            end
+        end
     end
 end
 
@@ -172,20 +194,26 @@ end
 function game.handleNetwork()
     local msg = game.channels.networkLog:pop()
     while msg do
-        --print(love.filesystem.append(game.networkLogFile, bitser.dumps(msg)))
-        print(pprint.pformat(msg))
+        pprint.pprint(msg)
         msg = game.channels.networkLog:pop()
     end
 
     local msg = game.channels.fromNetwork:pop()
     while msg do
-        if msg == "Disconnected" then
-            Gamestate.pop("Opponent Retreated")
-            return
-        elseif msg.command == "Start" then
-            startGame(msg.data)
-        elseif msg.command == "State" then
-            game.state = msg.data
+        if type(msg) == "string" then
+            if msg == "Disconnected" then
+                Gamestate.pop("Opponent Retreated")
+                return
+            end
+        elseif type(msg) == "table" then
+            if msg.command == "Start" then
+                startGame(msg.data)
+            elseif msg.command == "State" then
+                game.state = msg.data
+            end
+        elseif type(msg) == "number" then
+            -- Ping
+            game.ping = msg / 1000
         end
         msg = game.channels.fromNetwork:pop()
     end
@@ -193,7 +221,7 @@ end
 
 
 function game:update(dt)
-    game.handleLogs()
+    -- game.handleLogs()
     game.handleErrors()
 
     game.handleGame(dt)
@@ -202,7 +230,28 @@ end
 
 
 function game:draw()
+    love.graphics.clear(1, 1, 1)
 
+    local w,h = love.graphics.getDimensions()
+    local scale = math.min(w/1200, h/800)
+    local paddingX = (w / scale - 1200) / 2
+    local paddingY = (h / scale - 800) / 2
+
+    love.graphics.scale(scale)
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.rectangle("fill", 0, 0, paddingX, h)
+    love.graphics.rectangle("fill", 0, 0, w, paddingY)
+    love.graphics.rectangle("fill", w/scale-paddingX, 0, w, h)
+    love.graphics.rectangle("fill", 0, h/scale-paddingY, w, paddingY)
+
+    love.graphics.translate(paddingX, paddingY)
+
+    if game.map then
+        love.graphics.setColor(0, 0, 0)
+        for _,b in ipairs(game.map.blocks) do
+            love.graphics.rectangle("fill", b.x * 40, b.y * 40, b.w * 40, b.h * 40)
+        end
+    end
 end
 
 

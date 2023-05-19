@@ -21,10 +21,10 @@ local commands = {}
 function respond(msg)
     assert(msg)
     assert(msg.command)
-    assert(peer)
-
-    channels.log:push("Sending message " .. msg.command)
-    peer:send(bitser.dumps(msg))
+    if peer then
+        channels.log:push("Sending message " .. msg.command)
+        peer:send(bitser.dumps(msg))
+    end
 end
 
 
@@ -45,9 +45,11 @@ commands.VerifyVersion = function(data, peer)
     end
 
     if isClient then
+        print("Responding")
         sendVerifyVersion(peer)
     end
     if running then
+        print("Starting")
         channels.fromNetwork:push("Start")
     end
 end
@@ -106,7 +108,10 @@ local status, error = pcall(function()
         end
     else
         host = enet.host_create()
-        host:connect(ip .. ":49620")
+        if not string.find(":", ip) then
+            ip = ip .. ":49620"
+        end
+        host:connect(ip)
         local event = host:service(5000)
 
         if not event then
@@ -134,6 +139,10 @@ local status, error = pcall(function()
         while event and running do
             handleEvent(event)
             event = host:service()
+        end
+
+        if peer then
+            channels.fromNetwork:push(peer:round_trip_time())
         end
     end
 end)
