@@ -49,12 +49,12 @@ function startRound()
     else
         -- enet seems to overestimate ping at first, so to ensure client doesn't get too far ahead
         -- we divide ping by 4 instead of 2
-        -- discrepancy could be due to clumsy not delaying messages symmetrically though
+        -- discrepancy could be due to Clumsy not delaying messages symmetrically though
         game.waitTimeLeft = 3 - game.ping / 4
     end
 
     selectMap()
-    game.world = love.physics.newWorld()
+    game.world = love.physics.newWorld(0, 0)
     game.map = maps.instantiate(game.mapEntry.name, game.world)
 end
 
@@ -98,7 +98,7 @@ function startGame(state)
             tanks = {},
         }
         game.lastUpdateSent = 0
-        game.networkUpdateInterval = 0.1
+        game.networkUpdateInterval = 0.05
         selectMap()
         sendStart()
     end
@@ -127,7 +127,8 @@ function game:enter()
         log = love.thread.getChannel("log"),
         networkLog = love.thread.getChannel("networkLog")
     }
-    game.ping = .1 -- A guess
+    game.ping = .1 -- A guess of 100ms
+    game.mapEntry = nil
     if game.network.isServer then
         startGame()
     end
@@ -139,6 +140,12 @@ function game.handleLogs()
     while msg do
         print(msg)
         msg = game.channels.log:pop()
+    end
+
+    local msg = game.channels.networkLog:pop()
+    while msg do
+        pprint.pprint(msg)
+        msg = game.channels.networkLog:pop()
     end
 end
 
@@ -155,6 +162,46 @@ function game.handleErrors()
         end
         print(msg.error)
         Gamestate.pop(body)
+    end
+end
+
+
+function game.handleControls(p, i)
+    if not p then return end
+
+    local x, y = 0, 0
+    if love.keyboard.isDown("w") then y = y - 1 end
+    if love.keyboard.isDown("a") then x = x - 1 end
+    if love.keyboard.isDown("s") then y = y + 1 end
+    if love.keyboard.isDown("d") then x = x + 1 end
+
+    local len = math.sqrt(x * x + y * y)
+    if len > 0 then
+        x = x / len
+        y = y / len
+    end
+
+    local dx = x * 5
+    local dy = y * 5
+    p.body:setLinearVelocity(dx, dy)
+
+    game.state.tanks[i] = {
+        x = p.body:getX(),
+        y = p.body:getY(),
+        dx = dx,
+        dy = dy
+    }
+end
+
+
+function game.updateFromNetwork()
+    local otherPlayerIndex = 1
+    if game.network.isServer then otherPlayerIndex = 2 end
+    local b = game.map.players[otherPlayerIndex].body
+    local netPos = game.state.tanks[otherPlayerIndex]
+    if netPos then
+        b:setPosition(netPos.x, netPos.y)
+        b:setLinearVelocity(netPos.dx, netPos.dy)
     end
 end
 
@@ -187,17 +234,20 @@ function game.handleGame(dt)
                 game.lastUpdateSent = game.lastUpdateSent - game.networkUpdateInterval
             end
         end
+
+        if n.isServer then
+            game.handleControls(game.map.players[1], 1)
+        else
+            game.handleControls(game.map.players[2], 2)
+            game.updateFromNetwork()
+        end
+
+        game.world:update(dt)
     end
 end
 
 
 function game.handleNetwork()
-    local msg = game.channels.networkLog:pop()
-    while msg do
-        pprint.pprint(msg)
-        msg = game.channels.networkLog:pop()
-    end
-
     local msg = game.channels.fromNetwork:pop()
     while msg do
         if type(msg) == "string" then
@@ -212,10 +262,28 @@ function game.handleNetwork()
                 game.state = msg.data
             end
         elseif type(msg) == "number" then
-            -- Ping
             game.ping = msg / 1000
         end
         msg = game.channels.fromNetwork:pop()
+    end
+end
+
+
+function drawMap()
+    
+    -- Draw blocks
+    love.graphics.setColor(0, 0, 0)
+    for _,b in ipairs(game.map.blocks) do
+        love.graphics.rectangle("fill", b.x, b.y, b.w, b.h)
+    end
+
+    -- Draw players
+    love.graphics.setColor(1, 0, 0)
+    for i = 1,2 do
+        local p = game.map.players[i]
+        if p then
+            love.graphics.circle("fill", p.body:getX(), p.body:getY(), 0.75)
+        end
     end
 end
 
@@ -239,18 +307,16 @@ function game:draw()
 
     love.graphics.scale(scale)
     love.graphics.setColor(0, 0, 0)
-    love.graphics.rectangle("fill", 0, 0, paddingX, h)
-    love.graphics.rectangle("fill", 0, 0, w, paddingY)
+    love.graphics.rectangle("fill", 0, 0, paddingX, h/scale)
+    love.graphics.rectangle("fill", 0, 0, w/scale, paddingY)
     love.graphics.rectangle("fill", w/scale-paddingX, 0, w, h)
     love.graphics.rectangle("fill", 0, h/scale-paddingY, w, paddingY)
-
     love.graphics.translate(paddingX, paddingY)
+    love.graphics.scale(40)
+
 
     if game.map then
-        love.graphics.setColor(0, 0, 0)
-        for _,b in ipairs(game.map.blocks) do
-            love.graphics.rectangle("fill", b.x * 40, b.y * 40, b.w * 40, b.h * 40)
-        end
+        drawMap()
     end
 end
 

@@ -12,6 +12,8 @@ Menu = require "menu"
 
 
 function love.load(args)
+    love.physics.setMeter(1)
+
     Gamestate.registerEvents({'draw', 'update', 'keypressed', 'textinput', 'mousepressed', 'mousereleased', 'quit' })
     Menu.initArgs(args)
     Gamestate.switch(Menu)
