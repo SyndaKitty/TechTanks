@@ -1,4 +1,4 @@
-extends Reference
+extends RefCounted
 
 static func _snake2pascal(string: String) -> String:
 	var pascal_string := '';
@@ -26,3 +26,13 @@ static func try_call_interop_method(obj: Object, snake_case_method: String, arg_
 	if obj.has_method(pascal_case_method):
 		return obj.callv(pascal_case_method, arg_array)
 	return default_return
+
+static func get_system_time_msecs():
+	var unix_time: float = Time.get_unix_time_from_system()
+	var unix_time_int: int = unix_time
+	var ms: int = (unix_time - unix_time_int) * 1000.0
+	
+static func get_system_time_usecs():
+	var unix_time: float = Time.get_unix_time_from_system()
+	var unix_time_int: int = unix_time
+	var ms: int = (unix_time - unix_time_int) * 1000.0 * 1000.0

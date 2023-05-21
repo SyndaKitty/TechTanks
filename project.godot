@@ -13,6 +13,10 @@ config_version=5
 config/name="TechTanks"
 config/features=PackedStringArray("4.0", "GL Compatibility")
 
+[autoload]
+
+SyncManager="*res://addons/godot-rollback-netcode/SyncManager.gd"
+
 [display]
 
 window/size/mode=2

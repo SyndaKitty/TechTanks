@@ -1,11 +1,11 @@
-tool
+@tool
 extends Control
 
 const Logger = preload("res://addons/godot-rollback-netcode/Logger.gd")
 const LogData = preload("res://addons/godot-rollback-netcode/log_inspector/LogData.gd")
 
-var start_time := 0 setget set_start_time
-var cursor_time := -1 setget set_cursor_time
+var start_time := 0: set = set_start_time
+var cursor_time := -1: set = set_cursor_time
 
 var show_network_arrows := true
 var network_arrow_peers := []
@@ -54,38 +54,36 @@ func refresh_from_log_data() -> void:
 		if network_arrow_peers.size() < 2 and log_data.peer_ids.size() >= 2:
 			network_arrow_peers = [log_data.peer_ids[0], log_data.peer_ids[1]]
 	
-	update()
+	queue_redraw()
 
 func set_start_time(_start_time: int) -> void:
 	if start_time != _start_time:
 		start_time = _start_time
-		update()
+		queue_redraw()
 		emit_signal("start_time_changed", start_time)
 
 func set_cursor_time(_cursor_time: int) -> void:
 	if cursor_time != _cursor_time:
 		cursor_time = _cursor_time
-		update()
+		queue_redraw()
 		emit_signal("cursor_time_changed", cursor_time)
 		
 		var relative_cursor_time = cursor_time - start_time
 		if relative_cursor_time < 0:
-			set_start_time(cursor_time - (rect_size.x - CURSOR_SCROLL_GAP))
-		elif relative_cursor_time > rect_size.x:
+			set_start_time(cursor_time - (size.x - CURSOR_SCROLL_GAP))
+		elif relative_cursor_time > size.x:
 			set_start_time(cursor_time - CURSOR_SCROLL_GAP)
 
 func _ready() -> void:
-	_font = DynamicFont.new()
-	_font.font_data = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
+	_font = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
 	_font.size = 16
 	
-	_font_big = DynamicFont.new()
-	_font_big.font_data = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
+	_font_big = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
 	_font_big.size = 32
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
-		if event.button_index == BUTTON_LEFT and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			set_cursor_time(int(start_time + event.position.x))
 
 func _draw_peer(peer_id: int, peer_rect: Rect2, draw_data: Dictionary) -> void:
@@ -214,17 +212,17 @@ func _draw_network_arrows(start_positions: Dictionary, end_positions: Dictionary
 		var sqrt12 = sqrt(0.5)
 		var vector: Vector2 = end_position - start_position
 		var t := Transform2D(vector.angle(), end_position)
-		var points := PoolVector2Array([
-			t.xform(Vector2(0, 0)),
-			t.xform(Vector2(-NETWORK_ARROW_SIZE, sqrt12 * NETWORK_ARROW_SIZE)),
-			t.xform(Vector2(-NETWORK_ARROW_SIZE, sqrt12 * -NETWORK_ARROW_SIZE)),
+		var points := PackedVector2Array([
+			t * Vector2(0, 0),
+			t * Vector2(-NETWORK_ARROW_SIZE, sqrt12 * NETWORK_ARROW_SIZE),
+			t * Vector2(-NETWORK_ARROW_SIZE, sqrt12 * -NETWORK_ARROW_SIZE),
 		])
-		var colors := PoolColorArray([
+		var colors := PackedColorArray([
 			color,
 			color,
 			color,
 		])
-		draw_primitive(points, colors, PoolVector2Array())
+		draw_primitive(points, colors, PackedVector2Array())
 
 func _draw() -> void:
 	if log_data == null or log_data.is_loading():
@@ -236,13 +234,13 @@ func _draw() -> void:
 	var draw_data := {}
 	var peer_rects := {}
 	
-	var peer_height: float = (rect_size.y - ((peer_count - 1) * PEER_GAP)) / peer_count
+	var peer_height: float = (size.y - ((peer_count - 1) * PEER_GAP)) / peer_count
 	var current_y := 0
 	for peer_index in range(peer_count):
 		var peer_id = log_data.peer_ids[peer_index]
 		var peer_rect := Rect2(
 			Vector2(0, current_y),
-			Vector2(rect_size.x, peer_height))
+			Vector2(size.x, peer_height))
 		peer_rects[peer_id] = peer_rect
 		_draw_peer(peer_id, peer_rect, draw_data)
 		current_y += (peer_height + PEER_GAP)
@@ -255,11 +253,11 @@ func _draw() -> void:
 	
 	for peer_id in peer_rects:
 		var peer_rect: Rect2 = peer_rects[peer_id]
-		draw_string(_font, peer_rect.position + Vector2(0, PEER_GAP), "Peer %s" % peer_id, Color(1.0, 1.0, 1.0))
+		draw_string(_font, peer_rect.position + Vector2(0, PEER_GAP), "Peer %s" % peer_id, 0, -1, _font.size, Color(1.0, 1.0, 1.0))
 	
-	if cursor_time >= start_time and cursor_time <= start_time + rect_size.x:
+	if cursor_time >= start_time and cursor_time <= start_time + size.x:
 		draw_line(
 			Vector2(cursor_time - start_time, 0),
-			Vector2(cursor_time - start_time, rect_size.y),
+			Vector2(cursor_time - start_time, size.y),
 			Color(1.0, 0.0, 0.0),
 			3.0)

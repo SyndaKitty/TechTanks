@@ -9,7 +9,7 @@ const Logger = preload("res://addons/godot-rollback-netcode/Logger.gd")
 const DebugStateComparer = preload("res://addons/godot-rollback-netcode/DebugStateComparer.gd")
 const Utils = preload("res://addons/godot-rollback-netcode/Utils.gd")
 
-class Peer extends Reference:
+class Peer extends RefCounted:
 	var peer_id: int
 	
 	var rtt: int
@@ -139,22 +139,22 @@ const DEFAULT_NETWORK_ADAPTOR_PATH := "res://addons/godot-rollback-netcode/RPCNe
 const DEFAULT_MESSAGE_SERIALIZER_PATH := "res://addons/godot-rollback-netcode/MessageSerializer.gd"
 const DEFAULT_HASH_SERIALIZER_PATH := "res://addons/godot-rollback-netcode/HashSerializer.gd"
 
-var network_adaptor: Object setget set_network_adaptor
-var message_serializer: Object setget set_message_serializer
-var hash_serializer: Object setget set_hash_serializer
+var network_adaptor: set = set_network_adaptor
+var message_serializer: set = set_message_serializer
+var hash_serializer: set = set_hash_serializer
 
 var peers := {}
 var input_buffer := []
 var state_buffer := []
 var state_hashes := []
 
-var mechanized := false setget set_mechanized
+var mechanized := false: set = set_mechanized
 var mechanized_input_received := {}
 var mechanized_rollback_ticks := 0
 
 var max_buffer_size := 20
 var ticks_to_calculate_advantage := 60
-var input_delay := 2 setget set_input_delay
+var input_delay := 2: set = set_input_delay
 var max_input_frames_per_message := 5
 var max_messages_at_once := 2
 var max_ticks_to_regain_sync := 300
@@ -172,15 +172,15 @@ var debug_check_message_serializer_roundtrip := false
 var debug_check_local_state_consistency := false
 
 # In seconds, because we don't want it to be dependent on the network tick.
-var ping_frequency := 1.0 setget set_ping_frequency
+var ping_frequency := 1.0: set = set_ping_frequency
 
-var input_tick: int = 0 setget _set_readonly_variable
-var current_tick: int = 0 setget _set_readonly_variable
-var skip_ticks: int = 0 setget _set_readonly_variable
-var rollback_ticks: int = 0 setget _set_readonly_variable
-var requested_input_complete_tick: int = 0 setget _set_readonly_variable
-var started := false setget _set_readonly_variable
-var tick_time: float setget _set_readonly_variable
+var input_tick: int = 0: set = _set_readonly_variable
+var current_tick: int = 0: set = _set_readonly_variable
+var skip_ticks: int = 0: set = _set_readonly_variable
+var rollback_ticks: int = 0: set = _set_readonly_variable
+var requested_input_complete_tick: int = 0: set = _set_readonly_variable
+var started := false: set = _set_readonly_variable
+var tick_time: float: set = _set_readonly_variable
 
 var _host_starting := false
 var _ping_timer: Timer
@@ -270,8 +270,8 @@ func _ready() -> void:
 	_ping_timer.wait_time = ping_frequency
 	_ping_timer.autostart = true
 	_ping_timer.one_shot = false
-	_ping_timer.pause_mode = Node.PAUSE_MODE_PROCESS
-	_ping_timer.connect("timeout", self, "_on_ping_timer_timeout")
+	_ping_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	_ping_timer.connect("timeout", _on_ping_timer_timeout)
 	add_child(_ping_timer)
 	
 	_spawn_manager = SpawnManager.new()
@@ -395,7 +395,7 @@ func _on_ping_timer_timeout() -> void:
 	if peers.size() == 0:
 		return
 	var msg = {
-		local_time = OS.get_system_time_msecs(),
+		local_time = Utils.get_system_time_msecs(),
 	}
 	for peer_id in peers:
 		assert(peer_id != network_adaptor.get_network_unique_id(), "Cannot ping ourselves")
@@ -403,11 +403,11 @@ func _on_ping_timer_timeout() -> void:
 
 func _on_received_ping(peer_id: int, msg: Dictionary) -> void:
 	assert(peer_id != network_adaptor.get_network_unique_id(), "Cannot ping back ourselves")
-	msg['remote_time'] = OS.get_system_time_msecs()
+	msg['remote_time'] = Utils.get_system_time_msecs()
 	network_adaptor.send_ping_back(peer_id, msg)
 
 func _on_received_ping_back(peer_id: int, msg: Dictionary) -> void:
-	var system_time = OS.get_system_time_msecs()
+	var system_time = Utils.get_system_time_msecs()
 	var peer = peers[peer_id]
 	peer.last_ping_received = system_time
 	peer.rtt = system_time - msg['local_time']
@@ -416,8 +416,6 @@ func _on_received_ping_back(peer_id: int, msg: Dictionary) -> void:
 
 func start_logging(log_file_path: String, match_info: Dictionary = {}) -> void:
 	# Our logger needs threads!
-	if not OS.can_use_threads():
-		return
 	if mechanized:
 		return
 	
@@ -455,7 +453,7 @@ func start() -> void:
 		
 		# Wait for half the highest RTT to start locally.
 		print ("Delaying host start by %sms" % (highest_rtt / 2))
-		yield(get_tree().create_timer(highest_rtt / 2000.0), 'timeout')
+		await get_tree().create_timer(highest_rtt / 2000.0).timeout
 		
 		_on_received_remote_start()
 		_host_starting = false
@@ -487,7 +485,7 @@ func _reset() -> void:
 
 func _on_received_remote_start() -> void:
 	_reset()
-	tick_time = (1.0 / Engine.iterations_per_second)
+	tick_time = (1.0 / Engine.physics_ticks_per_second)
 	started = true
 	network_adaptor.start_network_adaptor(self)
 	_spawn_manager.reset()
@@ -996,7 +994,7 @@ func _physics_process(_delta: float) -> void:
 		_logger.data['input_complete_tick'] = _input_complete_tick
 		_logger.data['state_complete_tick'] = _state_complete_tick
 	
-	var start_time := OS.get_ticks_usec()
+	var start_time := Time.get_ticks_usec()
 	
 	# @todo Is there a way we can move this to _remote_start()?
 	# Store an initial state before any ticks.
@@ -1169,7 +1167,7 @@ func _physics_process(_delta: float) -> void:
 		
 		# Only serialize and send input when we have real remote peers.
 		if peers.size() > 0:
-			var serialized_input: PoolByteArray = message_serializer.serialize_input(local_input)
+			var serialized_input: PackedByteArray = message_serializer.serialize_input(local_input)
 			
 			# check that the serialized then unserialized input matches the original 
 			if debug_check_message_serializer_roundtrip:
@@ -1209,7 +1207,7 @@ func _physics_process(_delta: float) -> void:
 	_ran_physics_process = true
 	_ticks_since_last_interpolation_frame += 1
 	
-	var total_time_msecs = float(OS.get_ticks_usec() - start_time) / 1000.0
+	var total_time_msecs = float(Time.get_ticks_usec() - start_time) / 1000.0
 	if debug_physics_process_msecs > 0 and total_time_msecs > debug_physics_process_msecs:
 		push_error("[%s] SyncManager._physics_process() took %.02fms" % [current_tick, total_time_msecs])
 	
@@ -1220,7 +1218,7 @@ func _process(delta: float) -> void:
 	if not started:
 		return
 	
-	var start_time = OS.get_ticks_usec()
+	var start_time = Time.get_ticks_usec()
 	
 	# These are things that we want to run during "interpolation frames", in
 	# order to slim down the normal frames. Or, if interpolation is disabled,
@@ -1263,7 +1261,7 @@ func _process(delta: float) -> void:
 	# preceeded by _physics_process().
 	_ran_physics_process = false
 	
-	var total_time_msecs = float(OS.get_ticks_usec() - start_time) / 1000.0
+	var total_time_msecs = float(Time.get_ticks_usec() - start_time) / 1000.0
 	if debug_process_msecs > 0 and total_time_msecs > debug_process_msecs:
 		push_error("[%s] SyncManager._process() took %.02fms" % [current_tick, total_time_msecs])
 
@@ -1301,7 +1299,7 @@ func _calculate_data_hash(input: Dictionary) -> int:
 	input['$'] = serialized_hash
 	return serialized_hash
 
-func _on_received_input_tick(peer_id: int, serialized_msg: PoolByteArray) -> void:
+func _on_received_input_tick(peer_id: int, serialized_msg: PackedByteArray) -> void:
 	if not started:
 		return
 	
@@ -1471,7 +1469,7 @@ func is_respawning() -> bool:
 
 func set_default_sound_bus(bus: String) -> void:
 	if _sound_manager == null:
-		yield(self, "ready")
+		await self.ready
 	_sound_manager.default_bus = bus
 
 func play_sound(identifier: String, sound: AudioStream, info: Dictionary = {}) -> void:

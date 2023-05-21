@@ -31,17 +31,17 @@ var _skipped_tick_count := 0
 
 func attach_network_adaptor(sync_manager) -> void:
 	if OnlineMatch:
-		OnlineMatch.connect("webrtc_peer_added", self, '_on_OnlineMatch_webrtc_peer_added')
-		OnlineMatch.connect("webrtc_peer_removed", self, '_on_OnlineMatch_webrtc_peer_removed')
-		OnlineMatch.connect("disconnected", self, '_on_OnlineMatch_disconnected')
+		OnlineMatch.connect("webrtc_peer_added", _on_OnlineMatch_webrtc_peer_added)
+		OnlineMatch.connect("webrtc_peer_removed", _on_OnlineMatch_webrtc_peer_removed)
+		OnlineMatch.connect("disconnected", _on_OnlineMatch_disconnected)
 	else:
 		push_error("Can't find OnlineMatch singleton that the NakamaWebRTCNetworkAdaptor depends on!")
 
 func detach_network_adaptor(sync_manager) -> void:
 	if OnlineMatch:
-		OnlineMatch.disconnect("webrtc_peer_added", self, '_on_OnlineMatch_webrtc_peer_added')
-		OnlineMatch.disconnect("webrtc_peer_removed", self, '_on_OnlineMatch_webrtc_peer_removed')
-		OnlineMatch.disconnect("disconnected", self, '_on_OnlineMatch_disconnected')
+		OnlineMatch.disconnect("webrtc_peer_added", _on_OnlineMatch_webrtc_peer_added)
+		OnlineMatch.disconnect("webrtc_peer_removed", _on_OnlineMatch_webrtc_peer_removed)
+		OnlineMatch.disconnect("disconnected", _on_OnlineMatch_disconnected)
 
 func start_network_adaptor(sync_manager) -> void:
 	_last_messages.clear()
@@ -83,7 +83,7 @@ func _on_OnlineMatch_webrtc_peer_removed(webrtc_peer: WebRTCPeerConnection, play
 func _on_OnlineMatch_disconnected() -> void:
 	_data_channels.clear()
 
-func send_input_tick(peer_id: int, msg: PoolByteArray) -> void:
+func send_input_tick(peer_id: int, msg: PackedByteArray) -> void:
 	if _data_channels.has(peer_id) and _data_channels[peer_id].get_ready_state() == WebRTCDataChannel.STATE_OPEN:
 		var data_channel: WebRTCDataChannel = _data_channels[peer_id]
 		
@@ -115,7 +115,7 @@ func send_input_tick(peer_id: int, msg: PoolByteArray) -> void:
 		var last_messages_for_peer = _last_messages[peer_id]
 		
 		# Clear out expired duplicate message records.
-		var current_time = OS.get_ticks_msec()
+		var current_time = Time.get_ticks_msec()
 		while last_messages_for_peer.size() > 0:
 			if current_time - last_messages_for_peer[0].time >= max_duplicate_msecs:
 				#print ("[%s] Retiring duplicate from duplicate message history" % [SyncManager.current_tick])

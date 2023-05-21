@@ -1,17 +1,17 @@
-tool
-extends WindowDialog
+@tool
+extends Window
 
 const LogData = preload("res://addons/godot-rollback-netcode/log_inspector/LogData.gd")
 const DataGraph = preload("res://addons/godot-rollback-netcode/log_inspector/FrameDataGraph.gd")
 const DataGrid = preload("res://addons/godot-rollback-netcode/log_inspector/FrameDataGrid.gd")
 const TimeOffsetSetting = preload("res://addons/godot-rollback-netcode/log_inspector/FrameViewerTimeOffsetSetting.tscn")
 
-onready var show_network_arrows_field := $MarginContainer/GridContainer/ShowNetworkArrows
-onready var network_arrows_peer1_field := $MarginContainer/GridContainer/NetworkArrowsPeer1
-onready var network_arrows_peer2_field := $MarginContainer/GridContainer/NetworkArrowsPeer2
-onready var show_rollback_ticks_field = $MarginContainer/GridContainer/ShowRollbackTicks
-onready var max_rollback_ticks_field = $MarginContainer/GridContainer/MaxRollbackTicks
-onready var time_offset_container = $MarginContainer/GridContainer/TimeOffsetContainer
+@onready var show_network_arrows_field := $MarginContainer/GridContainer/ShowNetworkArrows
+@onready var network_arrows_peer1_field := $MarginContainer/GridContainer/NetworkArrowsPeer1
+@onready var network_arrows_peer2_field := $MarginContainer/GridContainer/NetworkArrowsPeer2
+@onready var show_rollback_ticks_field = $MarginContainer/GridContainer/ShowRollbackTicks
+@onready var max_rollback_ticks_field = $MarginContainer/GridContainer/MaxRollbackTicks
+@onready var time_offset_container = $MarginContainer/GridContainer/TimeOffsetContainer
 
 var log_data: LogData
 var data_graph: DataGraph
@@ -50,7 +50,7 @@ func _rebuild_peer_options(option_button: OptionButton) -> void:
 func _rebuild_peer_time_offset_fields() -> void:
 	# Remove all the old fields (disconnect signals).
 	for child in time_offset_container.get_children():
-		child.disconnect("time_offset_changed", self, "_on_peer_time_offset_changed")
+		child.disconnect("time_offset_changed", _on_peer_time_offset_changed)
 		time_offset_container.remove_child(child)
 		child.queue_free()
 	
