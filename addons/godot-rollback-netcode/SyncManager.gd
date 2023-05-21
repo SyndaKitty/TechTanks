@@ -237,8 +237,8 @@ func _exit_tree() -> void:
 	stop_logging()
 
 func _ready() -> void:
-	#get_tree().connect("network_peer_disconnected", self, "remove_peer")
-	#get_tree().connect("server_disconnected", self, "stop")
+	#get_tree().connect("network_peer_disconnected", remove_peer)
+	#get_tree().connect("server_disconnected", stop)
 	
 	var project_settings := {
 		max_buffer_size = 'network/rollback/max_buffer_size',
@@ -277,8 +277,8 @@ func _ready() -> void:
 	_spawn_manager = SpawnManager.new()
 	_spawn_manager.name = "SpawnManager"
 	add_child(_spawn_manager)
-	_spawn_manager.connect("scene_spawned", self, "_on_SpawnManager_scene_spawned")
-	_spawn_manager.connect("scene_despawned", self, "_on_SpawnManager_scene_despawned")
+	_spawn_manager.connect("scene_spawned", _on_SpawnManager_scene_spawned)
+	_spawn_manager.connect("scene_despawned", _on_SpawnManager_scene_despawned)
 	
 	_sound_manager = SoundManager.new()
 	_sound_manager.name = "SoundManager"
@@ -309,11 +309,11 @@ func set_network_adaptor(_network_adaptor: Object) -> void:
 	
 	if network_adaptor != null:
 		network_adaptor.detach_network_adaptor(self)
-		network_adaptor.disconnect("received_ping", self, "_on_received_ping")
-		network_adaptor.disconnect("received_ping_back", self, "_on_received_ping_back")
-		network_adaptor.disconnect("received_remote_start", self, "_on_received_remote_start")
-		network_adaptor.disconnect("received_remote_stop", self, "_on_received_remote_stop")
-		network_adaptor.disconnect("received_input_tick", self, "_on_received_input_tick")
+		network_adaptor.disconnect("received_ping", _on_received_ping)
+		network_adaptor.disconnect("received_ping_back", _on_received_ping_back)
+		network_adaptor.disconnect("received_remote_start", _on_received_remote_start)
+		network_adaptor.disconnect("received_remote_stop", _on_received_remote_stop)
+		network_adaptor.disconnect("received_input_tick", _on_received_input_tick)
 		
 		remove_child(network_adaptor)
 		network_adaptor.queue_free()
@@ -321,11 +321,11 @@ func set_network_adaptor(_network_adaptor: Object) -> void:
 	network_adaptor = _network_adaptor
 	network_adaptor.name = 'NetworkAdaptor'
 	add_child(network_adaptor)
-	network_adaptor.connect("received_ping", self, "_on_received_ping")
-	network_adaptor.connect("received_ping_back", self, "_on_received_ping_back")
-	network_adaptor.connect("received_remote_start", self, "_on_received_remote_start")
-	network_adaptor.connect("received_remote_stop", self, "_on_received_remote_stop")
-	network_adaptor.connect("received_input_tick", self, "_on_received_input_tick")
+	network_adaptor.connect("received_ping", _on_received_ping)
+	network_adaptor.connect("received_ping_back", _on_received_ping_back)
+	network_adaptor.connect("received_remote_start", _on_received_remote_start)
+	network_adaptor.connect("received_remote_stop", _on_received_remote_stop)
+	network_adaptor.connect("received_input_tick", _on_received_input_tick)
 	network_adaptor.attach_network_adaptor(self)
 
 func reset_network_adaptor() -> void:

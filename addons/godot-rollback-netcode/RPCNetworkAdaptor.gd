@@ -1,17 +1,19 @@
 extends "res://addons/godot-rollback-netcode/NetworkAdaptor.gd"
 
+@onready var mp = get_tree().get_multiplayer()
+
 func send_ping(peer_id: int, msg: Dictionary) -> void:
 	rpc_id(peer_id, "_remote_ping", msg)
 
 @rpc("any_peer", "unreliable") func _remote_ping(msg: Dictionary) -> void:
-	var peer_id = get_tree().get_rpc_sender_id()
+	var peer_id = mp.get_remote_sender_id()
 	emit_signal("received_ping", peer_id, msg)
 
 func send_ping_back(peer_id: int, msg: Dictionary) -> void:
 	rpc_id(peer_id, "_remote_ping_back", msg)
 
 @rpc("any_peer", "unreliable") func _remote_ping_back(msg: Dictionary) -> void:
-	var peer_id = get_tree().get_rpc_sender_id()
+	var peer_id = mp.get_remote_sender_id()
 	emit_signal("received_ping_back", peer_id, msg)
 
 func send_remote_start(peer_id: int) -> void:
@@ -30,16 +32,16 @@ func send_input_tick(peer_id: int, msg: PackedByteArray) -> void:
 	rpc_id(peer_id, '_rit', msg)
 
 func is_network_host() -> bool:
-	return get_tree().is_network_server()
+	return mp.is_server()
 
 func is_network_master_for_node(node: Node) -> bool:
-	return node.is_network_master()
+	return node.multiplayer.is_server()
 
 func get_network_unique_id() -> int:
-	return get_tree().get_network_unique_id()
+	return mp.get_unique_id()
 
 # _rit is short for _receive_input_tick. The method name ends up in each message
 # so, we're trying to keep it short.
 @rpc("any_peer", "unreliable") func _rit(msg: PackedByteArray) -> void:
-	emit_signal("received_input_tick", get_tree().get_rpc_sender_id(), msg)
+	emit_signal("received_input_tick", mp.get_remote_sender_id(), msg)
 

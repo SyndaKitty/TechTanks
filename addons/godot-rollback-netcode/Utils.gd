@@ -31,8 +31,10 @@ static func get_system_time_msecs():
 	var unix_time: float = Time.get_unix_time_from_system()
 	var unix_time_int: int = unix_time
 	var ms: int = (unix_time - unix_time_int) * 1000.0
+	return ms
 	
 static func get_system_time_usecs():
 	var unix_time: float = Time.get_unix_time_from_system()
 	var unix_time_int: int = unix_time
-	var ms: int = (unix_time - unix_time_int) * 1000.0 * 1000.0
+	var us: int = (unix_time - unix_time_int) * 1000.0 * 1000.0
+	return us

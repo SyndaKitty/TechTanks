@@ -60,7 +60,7 @@ func _rebuild_peer_time_offset_fields() -> void:
 		child.name = str(peer_id)
 		time_offset_container.add_child(child)
 		child.setup_time_offset_setting("Peer %s" % peer_id, log_data.peer_time_offsets[peer_id])
-		child.connect("time_offset_changed", self, "_on_peer_time_offset_changed", [peer_id])
+		child.connect("time_offset_changed", _on_peer_time_offset_changed, [peer_id])
 
 func _on_peer_time_offset_changed(value, peer_id) -> void:
 	log_data.set_peer_time_offset(peer_id, value)
