@@ -35,7 +35,7 @@ func is_network_host() -> bool:
 	return mp.is_server()
 
 func is_network_master_for_node(node: Node) -> bool:
-	return node.multiplayer.is_server()
+	return node.get_multiplayer_authority() == mp.get_unique_id()
 
 func get_network_unique_id() -> int:
 	return mp.get_unique_id()
