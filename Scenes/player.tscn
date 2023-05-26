@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://cruvib03880aj"]
+
+[ext_resource type="Script" path="res://Player.gd" id="1_th5p6"]
+[ext_resource type="Texture2D" uid="uid://bik61rjab5uat" path="res://Sprites/Tank1.png" id="2_xwbxm"]
+
+[node name="Player" type="Node2D" groups=["network_sync"]]
+script = ExtResource("1_th5p6")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_xwbxm")

@@ -48,13 +48,13 @@ func _on_client_button_pressed() -> void:
 func _on_network_peer_connected(peer_id: int):
 	message_label.text = "Connected!"
 	SyncManager.add_peer(peer_id)
-#
-#	$ServerPlayer.set_network_master(1)
-#	if mp.is_server():
-#		$ClientPlayer.set_network_master(peer_id)
-#	else:
-#		$ClientPlayer.set_network_master(get_tree().get_network_unique_id())
-#
+
+	$ServerPlayer.set_multiplayer_authority(1)
+	if mp.is_server():
+		$ClientPlayer.set_multiplayer_authority(peer_id)
+	else:
+		$ClientPlayer.set_multiplayer_authority(mp.get_unique_id())
+
 	if mp.is_server():
 		message_label.text = "Starting..."
 #		rpc("setup_match", {mother_seed = johnny.get_seed()})

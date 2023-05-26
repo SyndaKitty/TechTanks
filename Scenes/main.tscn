@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://cx4ei8oprl07r"]
+[gd_scene load_steps=3 format=3 uid="uid://cx4ei8oprl07r"]
 
 [ext_resource type="Script" path="res://Scenes/main.gd" id="1_chg2m"]
+[ext_resource type="PackedScene" uid="uid://cruvib03880aj" path="res://Scenes/player.tscn" id="2_jjdtn"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_chg2m")
@@ -118,6 +119,12 @@ offset_bottom = 26.0
 grow_horizontal = 0
 text = "Regaining sync...
 "
+
+[node name="ServerPlayer" parent="." instance=ExtResource("2_jjdtn")]
+position = Vector2(274, 319)
+
+[node name="ClientPlayer" parent="." instance=ExtResource("2_jjdtn")]
+position = Vector2(874, 321)
 
 [connection signal="pressed" from="CanvasLayer/ConnectionPanel/OuterDiv/InnerDiv/GridContainer/ServerButton" to="." method="_on_server_button_pressed"]
 [connection signal="pressed" from="CanvasLayer/ConnectionPanel/OuterDiv/InnerDiv/GridContainer/ClientButton" to="." method="_on_client_button_pressed"]
