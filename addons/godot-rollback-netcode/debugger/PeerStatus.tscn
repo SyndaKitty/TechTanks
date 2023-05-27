@@ -1,8 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://c1wugjt2kebmu"]
+[gd_scene load_steps=2 format=3 uid="uid://d3m5vj2nxdk4d"]
 
 [ext_resource type="Script" path="res://addons/godot-rollback-netcode/debugger/PeerStatus.gd" id="1"]
 
 [node name="PeerStatus" type="ColorRect"]
+custom_minimum_size = Vector2(200, 0)
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -14,6 +15,10 @@ script = ExtResource("1")
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
 mouse_filter = 2
 
 [node name="GridContainer" type="GridContainer" parent="VBoxContainer"]

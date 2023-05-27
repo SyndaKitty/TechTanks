@@ -1,5 +1,3 @@
-extends RefCounted
-
 const Utils = preload("res://addons/godot-rollback-netcode/Utils.gd")
 
 static func is_type(obj: Object):
@@ -32,44 +30,44 @@ func serialize_array(value: Array):
 
 func serialize_resource(value: Resource):
 	return {
-		"_" = 'resource',
-		path = value.resource_path,
+		'_': 'resource',
+		'path': value.resource_path,
 	}
 
 func serialize_object(value: Object):
 	return {
-		"_" = 'object',
-		string = value.to_string(),
+		'_': 'object',
+		'string': value.to_string(),
 	}
 
 func serialize_other(value):
 	if value is Vector2:
 		return {
-			"_" = 'Vector2',
-			x = value.x,
-			y = value.y,
+			'_': 'Vector2',
+			'x': value.x,
+			'y': value.y,
 		}
 	elif value is Vector3:
 		return {
-			"_" = 'Vector3',
-			x = value.x,
-			y = value.y,
-			z = value.z,
+			'_': 'Vector3',
+			'x': value.x,
+			'y': value.y,
+			'z': value.z,
 		}
 	elif value is Transform2D:
 		return {
-			"_" = 'Transform2D',
-			x = {x = value.x.x, y = value.x.y},
-			y = {x = value.y.x, y = value.y.y},
-			origin = {x = value.origin.x, y = value.origin.y},
+			'_': 'Transform2D',
+			'x': {x = value.x.x, y = value.x.y},
+			'y': {x = value.y.x, y = value.y.y},
+			'origin': {x = value.origin.x, y = value.origin.y},
 		}
 	elif value is Transform3D:
 		return {
-			"_" = 'Transform3D',
-			x = {x = value.basis.x.x, y = value.basis.x.y, z = value.basis.x.z},
-			y = {x = value.basis.y.x, y = value.basis.y.y, z = value.basis.y.z},
-			z = {x = value.basis.z.x, y = value.basis.z.y, z = value.basis.z.z},
-			origin = {x = value.origin.x, y = value.origin.y, z = value.origin.z},
+			'_': 'Transform3D',
+			'x': {x = value.basis.x.x, y = value.basis.x.y, z = value.basis.x.z},
+			'y': {x = value.basis.y.x, y = value.basis.y.y, z = value.basis.y.z},
+			'z': {x = value.basis.z.x, y = value.basis.z.y, z = value.basis.z.z},
+			'origin': {x = value.origin.x, y = value.origin.y, z = value.origin.z},
 		}
 	
 	return value
@@ -81,7 +79,7 @@ func unserialize(value):
 		
 		if value['_'] == 'resource':
 			return unserialize_resource(value)
-		elif value['_'] in ['Vector2', 'Vector3', 'Transform2D', 'Transform']:
+		elif value['_'] in ['Vector2', 'Vector3', 'Transform2D', 'Transform3D']:
 			return unserialize_other(value)
 		
 		return unserialize_object(value)

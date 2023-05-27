@@ -9,7 +9,7 @@ const Logger = preload("res://addons/godot-rollback-netcode/Logger.gd")
 const DebugStateComparer = preload("res://addons/godot-rollback-netcode/DebugStateComparer.gd")
 const Utils = preload("res://addons/godot-rollback-netcode/Utils.gd")
 
-class Peer extends RefCounted:
+class Peer:
 	var peer_id: int
 	
 	var rtt: int
@@ -139,9 +139,9 @@ const DEFAULT_NETWORK_ADAPTOR_PATH := "res://addons/godot-rollback-netcode/RPCNe
 const DEFAULT_MESSAGE_SERIALIZER_PATH := "res://addons/godot-rollback-netcode/MessageSerializer.gd"
 const DEFAULT_HASH_SERIALIZER_PATH := "res://addons/godot-rollback-netcode/HashSerializer.gd"
 
-var network_adaptor: set = set_network_adaptor
-var message_serializer: set = set_message_serializer
-var hash_serializer: set = set_hash_serializer
+var network_adaptor: Object: set = set_network_adaptor
+var message_serializer: Object: set = set_message_serializer
+var hash_serializer: Object: set = set_hash_serializer
 
 var peers := {}
 var input_buffer := []
@@ -237,8 +237,8 @@ func _exit_tree() -> void:
 	stop_logging()
 
 func _ready() -> void:
-	#get_tree().connect("network_peer_disconnected", remove_peer)
-	#get_tree().connect("server_disconnected", stop)
+	#get_tree().connect("network_peer_disconnected", self, "remove_peer")
+	#get_tree().connect("server_disconnected", self, "stop")
 	
 	var project_settings := {
 		max_buffer_size = 'network/rollback/max_buffer_size',
@@ -291,6 +291,7 @@ func _ready() -> void:
 		set_message_serializer(_create_class_from_project_settings('network/rollback/classes/message_serializer', DEFAULT_MESSAGE_SERIALIZER_PATH))
 	if hash_serializer == null:
 		set_hash_serializer(_create_class_from_project_settings('network/rollback/classes/hash_serializer', DEFAULT_HASH_SERIALIZER_PATH))
+
 
 func _create_class_from_project_settings(setting_name: String, default_path: String):
 	var class_path := ''
@@ -392,7 +393,7 @@ func _on_ping_timer_timeout() -> void:
 	if peers.size() == 0:
 		return
 	var msg = {
-		local_time = Utils.get_system_time_msecs(),
+		local_time = Time.get_ticks_msec(),
 	}
 	for peer_id in peers:
 		assert(peer_id != network_adaptor.get_network_unique_id(), "Cannot ping ourselves")
@@ -400,11 +401,11 @@ func _on_ping_timer_timeout() -> void:
 
 func _on_received_ping(peer_id: int, msg: Dictionary) -> void:
 	assert(peer_id != network_adaptor.get_network_unique_id(), "Cannot ping back ourselves")
-	msg['remote_time'] = Utils.get_system_time_msecs()
+	msg['remote_time'] = Time.get_ticks_msec()
 	network_adaptor.send_ping_back(peer_id, msg)
 
 func _on_received_ping_back(peer_id: int, msg: Dictionary) -> void:
-	var system_time = Utils.get_system_time_msecs()
+	var system_time = Time.get_ticks_msec()
 	var peer = peers[peer_id]
 	peer.last_ping_received = system_time
 	peer.rtt = system_time - msg['local_time']
@@ -412,7 +413,6 @@ func _on_received_ping_back(peer_id: int, msg: Dictionary) -> void:
 	emit_signal("peer_pinged_back", peer)
 
 func start_logging(log_file_path: String, match_info: Dictionary = {}) -> void:
-	# Our logger needs threads!
 	if mechanized:
 		return
 	
@@ -881,7 +881,7 @@ func _get_input_messages_from_send_queue_for_peer(peer: Peer) -> Array:
 	var old_messages = int(floor(max_messages_at_once / 2.0))
 	
 	return _get_input_messages_from_send_queue_in_range(last_index - (new_messages * max_input_frames_per_message) + 1, last_index, true) + \
-		   _get_input_messages_from_send_queue_in_range(first_index, first_index + (old_messages * max_input_frames_per_message) - 1)
+		_get_input_messages_from_send_queue_in_range(first_index, first_index + (old_messages * max_input_frames_per_message) - 1)
 
 func _get_state_hashes_for_peer(peer: Peer) -> Dictionary:
 	var ret := {}
@@ -1466,7 +1466,7 @@ func is_respawning() -> bool:
 
 func set_default_sound_bus(bus: String) -> void:
 	if _sound_manager == null:
-		await self.ready
+		await ready
 	_sound_manager.default_bus = bus
 
 func play_sound(identifier: String, sound: AudioStream, info: Dictionary = {}) -> void:

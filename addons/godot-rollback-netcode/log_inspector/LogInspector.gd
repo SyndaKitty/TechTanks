@@ -1,5 +1,5 @@
 @tool
-extends Control
+extends Window
 
 const LogData = preload("res://addons/godot-rollback-netcode/log_inspector/LogData.gd")
 const ReplayServer = preload("res://addons/godot-rollback-netcode/log_inspector/ReplayServer.gd")
@@ -47,13 +47,9 @@ func _ready() -> void:
 	# Show and make full screen if the scene is being run on its own.
 	if get_parent() == get_tree().root:
 		visible = true
-		anchor_right = 1
-		anchor_bottom = 1
-		offset_right = 0
-		offset_bottom = 0
 		start_log_inspector()
 
-func _on_LogInspector_about_to_show() -> void:
+func _on_LogInspector_about_to_popup() -> void:
 	start_log_inspector()
 
 func start_log_inspector() -> void:
@@ -198,3 +194,7 @@ func _on_DisconnectButton_pressed() -> void:
 
 func _on_ShowPeerField_item_selected(index: int) -> void:
 	refresh_replay()
+
+
+func _on_close_requested() -> void:
+	hide()

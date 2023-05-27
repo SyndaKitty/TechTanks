@@ -28,7 +28,7 @@ func refresh_from_log_data() -> void:
 	_rebuild_peer_options(network_arrows_peer2_field)
 	_rebuild_peer_time_offset_fields()
 	
-	show_network_arrows_field.pressed = data_graph.canvas.show_network_arrows
+	show_network_arrows_field.button_pressed = data_graph.canvas.show_network_arrows
 	var network_arrow_peers = data_graph.canvas.network_arrow_peers.duplicate()
 	network_arrow_peers.sort()
 	if network_arrow_peers.size() > 0:
@@ -36,7 +36,7 @@ func refresh_from_log_data() -> void:
 	if network_arrow_peers.size() > 1:
 		network_arrows_peer2_field.select(network_arrows_peer2_field.get_item_index(network_arrow_peers[1]))
 	
-	show_rollback_ticks_field.pressed = data_graph.canvas.show_rollback_ticks
+	show_rollback_ticks_field.button_pressed = data_graph.canvas.show_rollback_ticks
 	max_rollback_ticks_field.text = str(data_graph.canvas.max_rollback_ticks)
 
 func _rebuild_peer_options(option_button: OptionButton) -> void:
@@ -56,17 +56,17 @@ func _rebuild_peer_time_offset_fields() -> void:
 	
 	# Re-create new fields and connect the signals.
 	for peer_id in log_data.peer_ids:
-		var child = TimeOffsetSetting.instance()
+		var child = TimeOffsetSetting.instantiate()
 		child.name = str(peer_id)
 		time_offset_container.add_child(child)
 		child.setup_time_offset_setting("Peer %s" % peer_id, log_data.peer_time_offsets[peer_id])
-		child.connect("time_offset_changed", _on_peer_time_offset_changed, [peer_id])
+		child.connect("time_offset_changed", func(value): _on_peer_time_offset_changed(value, peer_id))
 
 func _on_peer_time_offset_changed(value, peer_id) -> void:
 	log_data.set_peer_time_offset(peer_id, value)
 
 func update_network_arrows() -> void:
-	if show_network_arrows_field.pressed:
+	if show_network_arrows_field.button_pressed:
 		if network_arrows_peer1_field.get_selected_id() != network_arrows_peer2_field.get_selected_id():
 			data_graph.canvas.show_network_arrows = true
 			data_graph.canvas.network_arrow_peers = [
@@ -88,13 +88,17 @@ func _on_NetworkArrowsPeer2_item_selected(index: int) -> void:
 	update_network_arrows()
 
 func _on_ShowRollbackTicks_pressed() -> void:
-	data_graph.canvas.show_rollback_ticks = show_rollback_ticks_field.pressed
+	data_graph.canvas.show_rollback_ticks = show_rollback_ticks_field.button_pressed
 	data_graph.canvas.update()
 
 func _on_MaxRollbackTicks_text_changed(new_text: String) -> void:
 	var value = max_rollback_ticks_field.text
-	if value.is_valid_integer():
+	if value.is_valid_int():
 		var value_int = value.to_int()
 		if value_int > 0:
 			data_graph.canvas.max_rollback_ticks = value_int
 			data_graph.canvas.update()
+
+
+func _on_close_requested() -> void:
+	hide()

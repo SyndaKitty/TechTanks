@@ -28,12 +28,12 @@ func log2json(input_filename: String, output_filename: String) -> bool:
 		print ("No such input file: %s" % input_filename)
 		return false
 	var infile := FileAccess.open_compressed(input_filename, FileAccess.READ, FileAccess.COMPRESSION_FASTLZ)
-	if infile == null:
+	if !infile:
 		print ("Unable to open input file: %s" % input_filename)
 		return false
 	
 	var outfile := FileAccess.open(output_filename, FileAccess.WRITE)
-	if outfile == null:
+	if !outfile:
 		infile.close()
 		print ("Unable to open output file: %s" % output_filename)
 		return false

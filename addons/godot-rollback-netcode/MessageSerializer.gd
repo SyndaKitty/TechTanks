@@ -1,5 +1,3 @@
-extends RefCounted
-
 const Utils = preload("res://addons/godot-rollback-netcode/Utils.gd")
 
 static func is_type(obj: Object):
@@ -18,10 +16,15 @@ enum InputMessageKey {
 }
 
 func serialize_input(input: Dictionary) -> PackedByteArray:
-	return var_to_bytes(input)
+	var stream = StreamPeerBuffer.new()
+	stream.put_var(input)
+	return stream.data_array
 
 func unserialize_input(serialized: PackedByteArray) -> Dictionary:
-	return bytes_to_var(serialized)
+	var stream = StreamPeerBuffer.new()
+	stream.put_data(serialized)
+	stream.seek(0)
+	return stream.get_var() as Dictionary
 
 func serialize_message(msg: Dictionary) -> PackedByteArray:
 	var buffer := StreamPeerBuffer.new()

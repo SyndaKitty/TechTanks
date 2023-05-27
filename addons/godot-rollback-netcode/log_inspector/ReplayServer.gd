@@ -5,7 +5,7 @@ const LogData = preload("res://addons/godot-rollback-netcode/log_inspector/LogDa
 
 const GAME_ARGUMENTS_SETTING = 'network/rollback/log_inspector/replay_arguments'
 const GAME_PORT_SETTING = 'network/rollback/log_inspector/replay_port'
-const MAIN_RUN_ARGS_SETTING = 'editor/main_run_args'
+const MAIN_RUN_ARGS_SETTING = 'editor/run/main_run_args'
 
 var server: TCPServer
 var connection: StreamPeerTCP
@@ -73,7 +73,8 @@ func launch_game() -> void:
 		var args := []
 		for arg in args_string.split(" "):
 			args.push_back(arg)
-		game_pid = OS.create_process(OS.get_executable_path(), args, false)
+		var output = []
+		game_pid = OS.execute(OS.get_executable_path(), args, output, false)
 
 func stop_game() -> void:
 	if editor_interface and editor_interface.is_playing_scene():

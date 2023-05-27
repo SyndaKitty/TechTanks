@@ -1,5 +1,3 @@
-extends RefCounted
-
 var start_timings := {}
 var timings := {}
 

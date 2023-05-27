@@ -1,6 +1,6 @@
 extends Node2D
 
-@export var speed = 8
+@export var speed = 4
 
 func _get_local_input() -> Dictionary:
 	var input_vector = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")

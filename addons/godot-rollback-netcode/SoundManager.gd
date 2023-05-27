@@ -44,7 +44,7 @@ func play_sound(identifier: String, sound: AudioStream, info: Dictionary = {}) -
 	
 	node.play()
 	
-	node.connect("finished", _on_audio_finished, [node])
+	node.connect("finished", _on_audio_finished.bind(node))
 
 func _on_audio_finished(node: Node) -> void:
 	remove_child(node)

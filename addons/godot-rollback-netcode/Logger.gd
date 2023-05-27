@@ -1,7 +1,3 @@
-extends RefCounted
-
-const Utils = preload("res://addons/godot-rollback-netcode/Utils.gd")
-
 enum LogType {
 	HEADER,
 	FRAME,
@@ -41,15 +37,15 @@ func _init(_sync_manager) -> void:
 	_writer_thread_mutex = Mutex.new()
 	_writer_thread_semaphore = Semaphore.new()
 	_writer_thread = Thread.new()
+	_log_file = null
 
 func start(log_file_name: String, peer_id: int, match_info: Dictionary = {}) -> int:
 	if not _started:
 		var err: int
 
 		_log_file = FileAccess.open_compressed(log_file_name, FileAccess.WRITE, FileAccess.COMPRESSION_FASTLZ)
-		err = FileAccess.get_open_error()
-		if err != OK:
-			return err
+		if !_log_file:
+			return FileAccess.get_open_error()
 		
 		var header := {
 			log_type = LogType.HEADER,
@@ -84,7 +80,7 @@ func stop() -> void:
 		data.clear()
 		_start_times.clear()
 
-func _writer_thread_function(_userdata) -> void:
+func _writer_thread_function() -> void:
 	while true:
 		_writer_thread_semaphore.wait()
 		
@@ -151,14 +147,14 @@ func begin_interframe() -> void:
 	if not data.has('frame_type'):
 		data['frame_type'] = FrameType.INTERFRAME
 	if not data.has('start_time'):
-		data['start_time'] = Utils.get_system_time_msecs()
+		data['start_time'] = Time.get_ticks_msec()
 
 func end_interframe() -> void:
 	if not data.has('frame_type'):
 		data['frame_type'] = FrameType.INTERFRAME
 	if not data.has('start_time'):
-		data['start_time'] = Utils.get_system_time_msecs() - 1
-	data['end_time'] = Utils.get_system_time_msecs()
+		data['start_time'] = Time.get_ticks_msec() - 1
+	data['end_time'] = Time.get_ticks_msec()
 	write_current_data()
 
 func begin_tick(tick: int) -> void:
@@ -167,10 +163,10 @@ func begin_tick(tick: int) -> void:
 	
 	data['frame_type'] = FrameType.TICK
 	data['tick'] = tick
-	data['start_time'] = Utils.get_system_time_msecs()
+	data['start_time'] = Time.get_ticks_msec()
 
 func end_tick(start_ticks_usecs: int) -> void:
-	data['end_time'] = Utils.get_system_time_msecs()
+	data['end_time'] = Time.get_ticks_msec()
 	data['duration'] = float(Time.get_ticks_usec() - start_ticks_usecs) / 1000.0
 	write_current_data()
 
@@ -185,16 +181,16 @@ func begin_interpolation_frame(tick: int) -> void:
 	
 	data['frame_type'] = FrameType.INTERPOLATION_FRAME
 	data['tick'] = tick
-	data['start_time'] = Utils.get_system_time_msecs()
+	data['start_time'] = Time.get_ticks_msec()
 
 func end_interpolation_frame(start_ticks_usecs: int) -> void:
-	data['end_time'] = Utils.get_system_time_msecs()
+	data['end_time'] = Time.get_ticks_msec()
 	data['duration'] = float(Time.get_ticks_usec() - start_ticks_usecs) / 1000.0
 	write_current_data()
 
 func log_fatal_error(msg: String) -> void:
 	if not data.has('end_time'):
-		data['end_time'] = Utils.get_system_time_msecs()
+		data['end_time'] = Time.get_ticks_msec()
 	data['fatal_error'] = true
 	data['fatal_error_message'] = msg
 	write_current_data()

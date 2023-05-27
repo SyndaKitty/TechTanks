@@ -31,7 +31,8 @@ const CURSOR_SCROLL_GAP := 100
 
 var log_data: LogData
 var _font: Font
-var _font_big: Font
+var _font_size: int = 16
+var _font_big_size: int = 32
 
 signal cursor_time_changed (cursor_time)
 signal start_time_changed (start_time)
@@ -76,10 +77,6 @@ func set_cursor_time(_cursor_time: int) -> void:
 
 func _ready() -> void:
 	_font = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
-	_font.size = 16
-	
-	_font_big = load("res://addons/godot-rollback-netcode/log_inspector/monogram_extended.ttf")
-	_font_big.size = 32
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -152,7 +149,7 @@ func _draw_peer(peer_id: int, peer_rect: Rect2, draw_data: Dictionary) -> void:
 						Logger.SkipReason.ADVANTAGE_ADJUSTMENT:
 							tick_letter = 'A'
 					if tick_letter != '':
-						tick_numbers_to_draw.append([_font_big, center_position - Vector2(5, 0), tick_letter, Color('f04dff')])
+						tick_numbers_to_draw.append([_font, center_position - Vector2(5, 0), tick_letter, Color('f04dff'), _font_big_size])
 			else:
 				frame_color = FRAME_TYPE_COLOR[frame.type]
 			
@@ -160,7 +157,7 @@ func _draw_peer(peer_id: int, peer_rect: Rect2, draw_data: Dictionary) -> void:
 			
 			if frame.type == Logger.FrameType.TICK and frame.data.has('tick') and not skipped:
 				var tick: int = frame.data['tick']
-				tick_numbers_to_draw.append([_font, center_position - Vector2(3, 0), str(tick), Color(1.0, 1.0, 1.0)])
+				tick_numbers_to_draw.append([_font, center_position - Vector2(3, 0), str(tick), Color(1.0, 1.0, 1.0), _font_size])
 				if frame.data.has('input_tick') and capture_network_arrow_positions:
 					var input_tick: int = frame.data['input_tick']
 					network_arrow_start_positions[input_tick] = center_position
@@ -175,7 +172,7 @@ func _draw_peer(peer_id: int, peer_rect: Rect2, draw_data: Dictionary) -> void:
 					rollback_height = extended_peer_rect.size.y
 				var rollback_point = Vector2(center_position.x, frame_rect.position.y + frame_rect.size.y - rollback_height)
 				if last_rollback_point != null:
-					draw_line(last_rollback_point, rollback_point, ROLLBACK_LINE_COLOR, 2.0, true)
+					draw_line(last_rollback_point, rollback_point, ROLLBACK_LINE_COLOR, 2.0)
 				last_rollback_point = rollback_point
 				
 		# Move on to the next frame.
@@ -206,16 +203,16 @@ func _draw_network_arrows(start_positions: Dictionary, end_positions: Dictionary
 			start_position.y -= 15
 			end_position.y += 10
 		
-		draw_line(start_position, end_position, color, 2.0, true)
+		draw_line(start_position, end_position, color, 2.0)
 		
 		# Draw the arrow head.
 		var sqrt12 = sqrt(0.5)
 		var vector: Vector2 = end_position - start_position
 		var t := Transform2D(vector.angle(), end_position)
 		var points := PackedVector2Array([
-			t * Vector2(0, 0),
-			t * Vector2(-NETWORK_ARROW_SIZE, sqrt12 * NETWORK_ARROW_SIZE),
-			t * Vector2(-NETWORK_ARROW_SIZE, sqrt12 * -NETWORK_ARROW_SIZE),
+			t.basis_xform(Vector2(0, 0)),
+			t.basis_xform(Vector2(-NETWORK_ARROW_SIZE, sqrt12 * NETWORK_ARROW_SIZE)),
+			t.basis_xform(Vector2(-NETWORK_ARROW_SIZE, sqrt12 * -NETWORK_ARROW_SIZE)),
 		])
 		var colors := PackedColorArray([
 			color,
@@ -253,7 +250,7 @@ func _draw() -> void:
 	
 	for peer_id in peer_rects:
 		var peer_rect: Rect2 = peer_rects[peer_id]
-		draw_string(_font, peer_rect.position + Vector2(0, PEER_GAP), "Peer %s" % peer_id, 0, -1, _font.size, Color(1.0, 1.0, 1.0))
+		draw_string(_font, peer_rect.position + Vector2(0, PEER_GAP), "Peer %s" % peer_id, HORIZONTAL_ALIGNMENT_LEFT, -1, _font_size, Color(1.0, 1.0, 1.0))
 	
 	if cursor_time >= start_time and cursor_time <= start_time + size.x:
 		draw_line(
